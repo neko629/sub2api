@@ -535,6 +535,28 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		updates[SettingKeyAccountSchedulingThresholds] = string(blob)
 	}
 
+	if settings.QuotaReferenceAccounts != nil {
+		clean := make(map[string]int64, len(settings.QuotaReferenceAccounts))
+		for platform, id := range settings.QuotaReferenceAccounts {
+			if !IsAllowedQuotaPlatform(platform) {
+				return nil, infraerrors.BadRequest("INVALID_QUOTA_REFERENCE_ACCOUNT", fmt.Sprintf("unknown platform %q", platform))
+			}
+			if id < 0 {
+				return nil, infraerrors.BadRequest("INVALID_QUOTA_REFERENCE_ACCOUNT", "account id must be a positive integer")
+			}
+			// id == 0 表示「该平台不指定基准账号」，直接丢弃而不是存 0，
+			// 这样读取侧无需区分「未配置」与「配置为 0」两种含义。
+			if id > 0 {
+				clean[platform] = id
+			}
+		}
+		blob, err := json.Marshal(clean)
+		if err != nil {
+			return nil, fmt.Errorf("marshal quota reference accounts: %w", err)
+		}
+		updates[SettingKeyQuotaReferenceAccounts] = string(blob)
+	}
+
 	updates[SettingKeyAllowUserViewErrorRequests] = strconv.FormatBool(settings.AllowUserViewErrorRequests)
 
 	return updates, nil
@@ -616,7 +638,7 @@ func validateDefaultPlatformQuotaMap(m map[string]*DefaultPlatformQuotaSetting) 
 		if pq == nil {
 			continue
 		}
-		for _, v := range []*float64{pq.DailyLimitUSD, pq.WeeklyLimitUSD, pq.MonthlyLimitUSD} {
+		for _, v := range []*float64{pq.FiveHourLimitUSD, pq.DailyLimitUSD, pq.WeeklyLimitUSD, pq.MonthlyLimitUSD} {
 			if v != nil && (*v < 0 || math.IsNaN(*v) || math.IsInf(*v, 0)) {
 				return infraerrors.BadRequest("INVALID_DEFAULT_PLATFORM_QUOTA", "platform quota limit must be a finite non-negative number")
 			}

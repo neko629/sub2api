@@ -303,6 +303,11 @@ type SystemSettings struct {
 	// 系统全局账号自动停调阈值（key = platform，100 = disabled）
 	AccountSchedulingThresholds map[string]int `json:"account_scheduling_thresholds"`
 
+	// QuotaReferenceAccounts 每平台的用量基准账号（platform → account id）。
+	// nil = 不修改；非 nil = 整体覆盖。生效后该平台用户的 5h / 周限额窗口
+	// 跟随该账号的真实上游窗口（最长 15s 内由 QuotaWindowSyncService 感知）。
+	QuotaReferenceAccounts map[string]int64 `json:"quota_reference_accounts"`
+
 	// 允许终端用户在用量页查看自己的失败请求
 	AllowUserViewErrorRequests bool
 }

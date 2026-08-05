@@ -1893,6 +1893,7 @@ func (s *AuthService) snapshotPlatformQuotaDefaults(ctx context.Context, userID 
 			Platform: platform,
 		}
 		if q != nil {
+			rec.FiveHourLimitUSD = q.FiveHourLimitUSD
 			rec.DailyLimitUSD = q.DailyLimitUSD
 			rec.WeeklyLimitUSD = q.WeeklyLimitUSD
 			rec.MonthlyLimitUSD = q.MonthlyLimitUSD

@@ -7,85 +7,109 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
-func TestMaybeReset(t *testing.T) {
-	start := time.Date(2026, 5, 22, 0, 0, 0, 0, time.UTC)
-	other := start.AddDate(0, 0, -1)
+// applyWindowUsage 取代了原先的 maybeReset / monthlyMaybeReset：
+// 过期判定按窗口来源分派，三种来源必须各自正确。
+
+// 日历窗口（日 / 未配基准账号时的周）：起点早于本轮边界才算过期。
+func TestApplyWindowUsage_CalendarSource(t *testing.T) {
+	now := time.Date(2026, 5, 22, 9, 0, 0, 0, time.UTC)
+	curr := time.Date(2026, 5, 22, 0, 0, 0, 0, time.UTC)
+	prev := curr.AddDate(0, 0, -1)
+	end := curr.Add(service.QuotaWindowDailyDuration)
+	win := service.ResolvedQuotaWindow{Start: &curr, End: &end, Source: service.QuotaWindowSourceCalendar}
+
 	cases := []struct {
 		name      string
-		prevUsage float64
 		prevStart *time.Time
-		currStart time.Time
-		cost      float64
-		want      float64
+		wantUsage float64
+		wantStart time.Time
 	}{
-		{"nil prev start resets", 10, nil, start, 1.5, 1.5},
-		{"different start resets", 10, &other, start, 1.5, 1.5},
-		{"same start accumulates", 10, &start, start, 1.5, 11.5},
+		{"nil 起点重置", nil, 1.5, curr},
+		{"上一日的起点重置", &prev, 1.5, curr},
+		{"同日起点累加", &curr, 11.5, curr},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := maybeReset(c.prevUsage, c.prevStart, c.currStart, c.cost); got != c.want {
-				t.Errorf("maybeReset = %v, want %v", got, c.want)
+			usage, start := applyWindowUsage(10, c.prevStart, 1.5, now, win, service.QuotaWindowDailyDuration)
+			if usage != c.wantUsage {
+				t.Errorf("usage = %v, want %v", usage, c.wantUsage)
+			}
+			if !start.Equal(c.wantStart) {
+				t.Errorf("start = %v, want %v", start, c.wantStart)
 			}
 		})
 	}
 }
 
-// TestMonthlyMaybeReset_NilStart 验证 prevStart=nil 时重置。
-func TestMonthlyMaybeReset_NilStart(t *testing.T) {
-	now := time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)
-	usage, start := monthlyMaybeReset(10.0, nil, 1.5, now)
-	if usage != 1.5 {
-		t.Errorf("usage = %v, want 1.5", usage)
-	}
-	if !start.Equal(now) {
-		t.Errorf("start = %v, want %v", start, now)
-	}
+// 滚动窗口（月 / 未配基准账号时的 5h）：满时长才重置，起点锚在首次消费时刻。
+func TestApplyWindowUsage_RollingSource(t *testing.T) {
+	win := service.ResolvedQuotaWindow{Source: service.QuotaWindowSourceRolling}
+	dur := service.QuotaWindowMonthlyDuration
+
+	t.Run("nil 起点重置并锚定 now", func(t *testing.T) {
+		now := time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)
+		usage, start := applyWindowUsage(10.0, nil, 1.5, now, win, dur)
+		if usage != 1.5 || !start.Equal(now) {
+			t.Errorf("got (%v, %v), want (1.5, %v)", usage, start, now)
+		}
+	})
+
+	t.Run("满 30 天重置", func(t *testing.T) {
+		windowStart := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+		now := windowStart.Add(dur)
+		usage, start := applyWindowUsage(8.0, &windowStart, 2.0, now, win, dur)
+		if usage != 2.0 || !start.Equal(now) {
+			t.Errorf("got (%v, %v), want (2.0, %v)", usage, start, now)
+		}
+	})
+
+	// 30 天滚动而非自然月：跨月但不足 30 天必须继续累加。
+	t.Run("跨自然月但不足 30 天累加", func(t *testing.T) {
+		windowStart := time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)
+		now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+		usage, start := applyWindowUsage(5.0, &windowStart, 1.0, now, win, dur)
+		if usage != 6.0 || !start.Equal(windowStart) {
+			t.Errorf("got (%v, %v), want (6.0, %v)", usage, start, windowStart)
+		}
+	})
 }
 
-// TestMonthlyMaybeReset_Expired 验证窗口满 30 天时重置（30 天恰好到期）。
-func TestMonthlyMaybeReset_Expired(t *testing.T) {
-	windowStart := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
-	// now = windowStart + 30d（刚好到期）
-	now := windowStart.Add(30 * 24 * time.Hour)
-	usage, start := monthlyMaybeReset(8.0, &windowStart, 2.0, now)
-	if usage != 2.0 {
-		t.Errorf("usage = %v, want 2.0 (reset)", usage)
-	}
-	if !start.Equal(now) {
-		t.Errorf("start = %v, want %v (new window)", start, now)
-	}
-}
+// 账号窗口（跟随基准账号的 5h / 周）：起点只要与本轮边界不等就算换窗。
+// 这是「基准账号窗口一滚动，所有用户同刻清零」的落库侧保证。
+func TestApplyWindowUsage_AccountSource(t *testing.T) {
+	now := time.Date(2026, 5, 22, 9, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 5, 22, 11, 12, 0, 0, time.UTC) // 上游给的非整点边界
+	start := end.Add(-service.QuotaWindowFiveHourDuration)
+	win := service.ResolvedQuotaWindow{Start: &start, End: &end, Source: service.QuotaWindowSourceAccount}
+	dur := service.QuotaWindowFiveHourDuration
 
-// TestMonthlyMaybeReset_CrossMonthBoundary 验证跨自然月时也使用 30 天滚动（不提前重置）。
-// 旧行为：5 月 1 日跨月立即重置；新行为：窗口起始 4 月 20 日，5 月 1 日仅过了 11 天，应累加。
-func TestMonthlyMaybeReset_CrossMonthBoundary(t *testing.T) {
-	windowStart := time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)
-	// 5 月 1 日：距起始 11 天，不足 30 天，应累加
-	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
-	usage, start := monthlyMaybeReset(5.0, &windowStart, 1.0, now)
-	if usage != 6.0 {
-		t.Errorf("usage = %v, want 6.0 (accumulate, not reset at month boundary)", usage)
-	}
-	if !start.Equal(windowStart) {
-		t.Errorf("start = %v, want %v (preserved)", start, windowStart)
-	}
-}
+	t.Run("同一轮窗口累加", func(t *testing.T) {
+		usage, got := applyWindowUsage(4.0, &start, 1.0, now, win, dur)
+		if usage != 5.0 || !got.Equal(start) {
+			t.Errorf("got (%v, %v), want (5.0, %v)", usage, got, start)
+		}
+	})
 
-// TestMonthlyMaybeReset_Active 验证窗口内正常累加。
-func TestMonthlyMaybeReset_Active(t *testing.T) {
-	windowStart := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
-	// 15 天内，窗口有效
-	now := windowStart.Add(15 * 24 * time.Hour)
-	usage, start := monthlyMaybeReset(3.0, &windowStart, 0.5, now)
-	if usage != 3.5 {
-		t.Errorf("usage = %v, want 3.5", usage)
-	}
-	if !start.Equal(windowStart) {
-		t.Errorf("start = %v, want %v", start, windowStart)
-	}
+	t.Run("上一轮窗口的起点重置", func(t *testing.T) {
+		prev := start.Add(-dur)
+		usage, got := applyWindowUsage(4.0, &prev, 1.0, now, win, dur)
+		if usage != 1.0 || !got.Equal(start) {
+			t.Errorf("got (%v, %v), want (1.0, %v)", usage, got, start)
+		}
+	})
+
+	// 管理员把上游窗口往回校准时，起点比本轮更晚也必须算换窗。
+	t.Run("任意不等的起点都重置", func(t *testing.T) {
+		skewed := start.Add(37 * time.Minute)
+		usage, got := applyWindowUsage(4.0, &skewed, 1.0, now, win, dur)
+		if usage != 1.0 || !got.Equal(start) {
+			t.Errorf("got (%v, %v), want (1.0, %v)", usage, got, start)
+		}
+	})
 }
 
 // TestUpdateLimitsRowQuery_HasDeletedAtGuard 通过读取源文件验证 updateLimitsRow

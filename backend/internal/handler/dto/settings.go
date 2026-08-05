@@ -338,6 +338,11 @@ type SystemSettings struct {
 	// 系统全局账号自动停调阈值（key = platform，100 = disabled）
 	AccountSchedulingThresholds map[string]int `json:"account_scheduling_thresholds,omitempty"`
 
+	// 用量基准账号（key = platform，value = account id）。
+	// 配置后该平台的用户 5h / 周限额窗口跟随此账号的真实上游窗口；
+	// 缺省/空 = 5h 按首次消费起算滚动、周按自然周（与该特性引入前一致）。
+	QuotaReferenceAccounts map[string]int64 `json:"quota_reference_accounts"`
+
 	// 允许终端用户在用量页查看自己的失败请求
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
 }

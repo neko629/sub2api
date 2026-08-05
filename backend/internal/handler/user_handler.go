@@ -22,6 +22,13 @@ type UserHandler struct {
 	emailCache            service.EmailCache
 	affiliateService      *service.AffiliateService
 	userPlatformQuotaRepo service.UserPlatformQuotaRepository
+	// quotaWindowResolver 解析 5h/周 窗口边界（可选依赖）。nil 时退回本地语义。
+	quotaWindowResolver service.QuotaWindowResolver
+}
+
+// SetQuotaWindowResolver 注入窗口解析器（可选依赖，wire 阶段调用）。
+func (h *UserHandler) SetQuotaWindowResolver(r service.QuotaWindowResolver) {
+	h.quotaWindowResolver = r
 }
 
 // NewUserHandler creates a new UserHandler
@@ -64,7 +71,8 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 	now := time.Now().UTC()
 	out := make([]map[string]any, 0, len(records))
 	for _, r := range records {
-		out = append(out, quotaview.LazyZeroQuotaForResponse(r, now, false))
+		windows := service.ResolveQuotaWindowsWith(h.quotaWindowResolver, r.Platform, now)
+		out = append(out, quotaview.LazyZeroQuotaForResponse(r, windows, now, false))
 	}
 	response.Success(c, map[string]any{"platform_quotas": out})
 }

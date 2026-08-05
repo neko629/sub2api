@@ -31,27 +31,43 @@ type UserPlatformQuotaKey struct {
 // UserPlatformQuotaCacheEntry Redis hash 反序列化结果。
 //
 // SchemaVersion 用于向后兼容：
-//   - 0（旧 entry，无 SchemaVersion 字段）→ 视为 cache MISS，强制 refresh
-//   - 1（当前版本）→ 包含 limits 和 window_start，可免 DB 查询
+//   - 0（最初的 entry，无 SchemaVersion 字段）→ 视为 cache MISS，强制 refresh
+//   - 1（含 limits 和 window_start，无 5h 档）→ 同样视为 MISS，强制 refresh
+//   - 2（当前版本）→ 含 5h 档，可免 DB 查询
+//
+// V1 → V2 的迁移代价：发布瞬间残留的 V1 entry 会被 Lua 的 schema 守卫拒绝累加，
+// 直到 preflight 回源 DB 把它重建为 V2。这段窗口内少量增量只落在 DB（flusher 快照
+// 仍在写），Redis 侧偏小。这与该守卫最初设计时接受的取舍一致 —— 宁可短暂少算，
+// 也不能让新旧字段混在同一个 entry 里导致 5h 用量凭空为 0 而放行。
 //
 // limit 字段为 nil 表示"无限额"（DB 中对应列为 NULL）。
-const UserPlatformQuotaCacheSchemaV1 = int64(1)
+const (
+	// UserPlatformQuotaCacheSchemaV1 保留仅为文档目的：标识「无 5h 档」的历史版本。
+	UserPlatformQuotaCacheSchemaV1 = int64(1)
+	// UserPlatformQuotaCacheSchemaV2 是当前版本，含 five_hour 三件套。
+	UserPlatformQuotaCacheSchemaV2 = int64(2)
+	// UserPlatformQuotaCacheSchemaCurrent 是读写双方都必须使用的当前版本号。
+	UserPlatformQuotaCacheSchemaCurrent = UserPlatformQuotaCacheSchemaV2
+)
 
 type UserPlatformQuotaCacheEntry struct {
-	DailyUsageUSD   float64
-	WeeklyUsageUSD  float64
-	MonthlyUsageUSD float64
-	Version         int64
-	SchemaVersion   int64
+	FiveHourUsageUSD float64
+	DailyUsageUSD    float64
+	WeeklyUsageUSD   float64
+	MonthlyUsageUSD  float64
+	Version          int64
+	SchemaVersion    int64
 
-	// 以下字段仅在 SchemaVersion >= 1 时有效
-	DailyLimitUSD   *float64
-	WeeklyLimitUSD  *float64
-	MonthlyLimitUSD *float64
+	// 以下字段仅在 SchemaVersion >= 1 时有效（FiveHour* 需 >= 2）
+	FiveHourLimitUSD *float64
+	DailyLimitUSD    *float64
+	WeeklyLimitUSD   *float64
+	MonthlyLimitUSD  *float64
 
-	DailyWindowStart   *time.Time
-	WeeklyWindowStart  *time.Time
-	MonthlyWindowStart *time.Time
+	FiveHourWindowStart *time.Time
+	DailyWindowStart    *time.Time
+	WeeklyWindowStart   *time.Time
+	MonthlyWindowStart  *time.Time
 }
 
 // BillingCache defines cache operations for billing service

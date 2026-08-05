@@ -365,6 +365,10 @@ type UpdateSettingsRequest struct {
 	// 各平台账号自动停调阈值（整体替换语义：nil = 不修改，non-nil = 整体覆盖）。
 	AccountSchedulingThresholds map[string]int `json:"account_scheduling_thresholds"`
 
+	// 用量基准账号（整体替换语义：nil = 不修改，non-nil = 整体覆盖）。
+	// 改动会立刻影响所有用户的 5h / 周限额窗口边界。
+	QuotaReferenceAccounts map[string]int64 `json:"quota_reference_accounts"`
+
 	// auth-source 层 platform quota 覆盖（override 语义：nil = 不修改，non-nil = 整体覆盖该 source 的 quota 配置）。
 	AuthSourceEmailPlatformQuotas    map[string]*service.DefaultPlatformQuotaSetting `json:"auth_source_default_email_platform_quotas"`
 	AuthSourceLinuxDoPlatformQuotas  map[string]*service.DefaultPlatformQuotaSetting `json:"auth_source_default_linuxdo_platform_quotas"`
@@ -1494,6 +1498,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		DefaultPlatformQuotas:       req.DefaultPlatformQuotas,
 		AccountSchedulingThresholds: req.AccountSchedulingThresholds,
 
+		// 用量基准账号（整体替换语义）
+		QuotaReferenceAccounts: req.QuotaReferenceAccounts,
+
 		RegistrationEnabled:                 req.RegistrationEnabled,
 		EmailVerifyEnabled:                  req.EmailVerifyEnabled,
 		RegistrationEmailSuffixWhitelist:    req.RegistrationEmailSuffixWhitelist,
@@ -2372,6 +2379,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		slog.Error("default_platform_quotas_get_failed", "error", err)
 	} else {
 		payload.DefaultPlatformQuotas = platformQuotas
+	}
+	payload.QuotaReferenceAccounts = h.settingService.GetQuotaReferenceAccounts(c.Request.Context())
+	if payload.QuotaReferenceAccounts == nil {
+		payload.QuotaReferenceAccounts = map[string]int64{}
 	}
 	response.Success(c, systemSettingsResponseData(payload, updatedAuthSourceDefaults))
 }

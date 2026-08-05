@@ -34,6 +34,19 @@ type UserHandler struct {
 	totpService           *service.TotpService                // 角色提升为管理员的 step-up 门控
 	userService           *service.UserService
 	settingService        *service.SettingService // step-up 功能开关
+	// quotaWindowResolver 解析 5h/周 窗口边界（可选依赖）。nil 时退回本地语义，
+	// 与「未配置用量基准账号」时的 enforcement 行为一致。
+	quotaWindowResolver service.QuotaWindowResolver
+}
+
+// SetQuotaWindowResolver 注入窗口解析器（可选依赖，wire 阶段调用）。
+func (h *UserHandler) SetQuotaWindowResolver(r service.QuotaWindowResolver) {
+	h.quotaWindowResolver = r
+}
+
+// quotaWindows 解析某平台四档窗口边界；展示层必须与 enforcement 用同一份边界。
+func (h *UserHandler) quotaWindows(platform string, now time.Time) map[string]service.ResolvedQuotaWindow {
+	return service.ResolveQuotaWindowsWith(h.quotaWindowResolver, platform, now)
 }
 
 // NewUserHandler creates a new admin user handler
@@ -702,7 +715,7 @@ func (h *UserHandler) GetUserPlatformQuotas(c *gin.Context) {
 	now := time.Now().UTC()
 	out := make([]map[string]any, 0, len(records))
 	for _, r := range records {
-		out = append(out, quotaview.LazyZeroQuotaForResponse(r, now, true)) // true = 暴露 window_start
+		out = append(out, quotaview.LazyZeroQuotaForResponse(r, h.quotaWindows(r.Platform, now), now, true)) // true = 暴露 window_start
 	}
 	response.Success(c, map[string]any{"platform_quotas": out})
 }
@@ -714,10 +727,11 @@ type UpdateUserPlatformQuotasRequest struct {
 
 // PlatformQuotaInput 单平台限额输入；limit 字段为 nil 表示不限制。
 type PlatformQuotaInput struct {
-	Platform        string   `json:"platform" binding:"required"`
-	DailyLimitUSD   *float64 `json:"daily_limit_usd"`
-	WeeklyLimitUSD  *float64 `json:"weekly_limit_usd"`
-	MonthlyLimitUSD *float64 `json:"monthly_limit_usd"`
+	Platform         string   `json:"platform" binding:"required"`
+	FiveHourLimitUSD *float64 `json:"five_hour_limit_usd"`
+	DailyLimitUSD    *float64 `json:"daily_limit_usd"`
+	WeeklyLimitUSD   *float64 `json:"weekly_limit_usd"`
+	MonthlyLimitUSD  *float64 `json:"monthly_limit_usd"`
 }
 
 // platform 合法性由 service.IsAllowedQuotaPlatform / service.AllowedQuotaPlatforms 统一判断（单一源）。
@@ -767,6 +781,7 @@ func (h *UserHandler) UpdateUserPlatformQuotas(c *gin.Context) {
 			name string
 			val  *float64
 		}{
+			{"five_hour_limit_usd", q.FiveHourLimitUSD},
 			{"daily_limit_usd", q.DailyLimitUSD},
 			{"weekly_limit_usd", q.WeeklyLimitUSD},
 			{"monthly_limit_usd", q.MonthlyLimitUSD},
@@ -789,11 +804,12 @@ func (h *UserHandler) UpdateUserPlatformQuotas(c *gin.Context) {
 	records := make([]service.UserPlatformQuotaRecord, 0, len(req.Quotas))
 	for _, q := range req.Quotas {
 		records = append(records, service.UserPlatformQuotaRecord{
-			UserID:          userID,
-			Platform:        q.Platform,
-			DailyLimitUSD:   q.DailyLimitUSD,
-			WeeklyLimitUSD:  q.WeeklyLimitUSD,
-			MonthlyLimitUSD: q.MonthlyLimitUSD,
+			UserID:           userID,
+			Platform:         q.Platform,
+			FiveHourLimitUSD: q.FiveHourLimitUSD,
+			DailyLimitUSD:    q.DailyLimitUSD,
+			WeeklyLimitUSD:   q.WeeklyLimitUSD,
+			MonthlyLimitUSD:  q.MonthlyLimitUSD,
 		})
 	}
 
@@ -825,12 +841,14 @@ func (h *UserHandler) UpdateUserPlatformQuotas(c *gin.Context) {
 	changes := make([]map[string]any, 0, len(records))
 	for _, r := range records {
 		entry := map[string]any{
-			"platform":          r.Platform,
-			"daily_limit_usd":   r.DailyLimitUSD,
-			"weekly_limit_usd":  r.WeeklyLimitUSD,
-			"monthly_limit_usd": r.MonthlyLimitUSD,
+			"platform":            r.Platform,
+			"five_hour_limit_usd": r.FiveHourLimitUSD,
+			"daily_limit_usd":     r.DailyLimitUSD,
+			"weekly_limit_usd":    r.WeeklyLimitUSD,
+			"monthly_limit_usd":   r.MonthlyLimitUSD,
 		}
 		if prev, ok := beforeByPlatform[r.Platform]; ok {
+			entry["before_five_hour_limit_usd"] = prev.FiveHourLimitUSD
 			entry["before_daily_limit_usd"] = prev.DailyLimitUSD
 			entry["before_weekly_limit_usd"] = prev.WeeklyLimitUSD
 			entry["before_monthly_limit_usd"] = prev.MonthlyLimitUSD
@@ -844,11 +862,12 @@ func (h *UserHandler) UpdateUserPlatformQuotas(c *gin.Context) {
 			continue
 		}
 		changes = append(changes, map[string]any{
-			"platform":                 prev.Platform,
-			"removed":                  true,
-			"before_daily_limit_usd":   prev.DailyLimitUSD,
-			"before_weekly_limit_usd":  prev.WeeklyLimitUSD,
-			"before_monthly_limit_usd": prev.MonthlyLimitUSD,
+			"platform":                   prev.Platform,
+			"removed":                    true,
+			"before_five_hour_limit_usd": prev.FiveHourLimitUSD,
+			"before_daily_limit_usd":     prev.DailyLimitUSD,
+			"before_weekly_limit_usd":    prev.WeeklyLimitUSD,
+			"before_monthly_limit_usd":   prev.MonthlyLimitUSD,
 		})
 	}
 	// before_snapshot_available 让审计消费方能识别 changes 中是否带 before_* 字段；
@@ -881,7 +900,7 @@ func (h *UserHandler) UpdateUserPlatformQuotas(c *gin.Context) {
 	}
 	out := make([]map[string]any, 0, len(records2))
 	for i := range records2 {
-		out = append(out, quotaview.LazyZeroQuotaForResponse(records2[i], now, true))
+		out = append(out, quotaview.LazyZeroQuotaForResponse(records2[i], h.quotaWindows(records2[i].Platform, now), now, true))
 	}
 	response.Success(c, map[string]any{"platform_quotas": out})
 }
@@ -893,9 +912,10 @@ type ResetUserPlatformQuotaWindowRequest struct {
 }
 
 var allowedWindowsForQuotaReset = map[string]struct{}{
-	"daily":   {},
-	"weekly":  {},
-	"monthly": {},
+	service.QuotaWindowFiveHour: {},
+	service.QuotaWindowDaily:    {},
+	service.QuotaWindowWeekly:   {},
+	service.QuotaWindowMonthly:  {},
 }
 
 // ResetUserPlatformQuotaWindow POST /admin/users/:id/platform-quotas/reset
@@ -934,7 +954,10 @@ func (h *UserHandler) ResetUserPlatformQuotaWindow(c *gin.Context) {
 		return
 	}
 	now := time.Now().UTC()
-	if err := h.userPlatformQuotaRepo.ResetExpiredWindow(ctx, userID, req.Platform, req.Window, now); err != nil {
+	// 窗口起点写「本轮窗口的起点」而不是 now：跟随基准账号的 5h/周 窗口有固定边界，
+	// 写 now 会让下一次预检立刻判定为跨窗（虽能自愈，但状态短暂失真）。
+	newStart := h.quotaWindows(req.Platform, now)[req.Window].NewStart(now)
+	if err := h.userPlatformQuotaRepo.ResetExpiredWindow(ctx, userID, req.Platform, req.Window, newStart); err != nil {
 		if errors.Is(err, service.ErrUserPlatformQuotaNotFound) {
 			response.NotFound(c, "user platform quota not found")
 			return
@@ -962,7 +985,7 @@ func (h *UserHandler) ResetUserPlatformQuotaWindow(c *gin.Context) {
 	}
 	out := make([]map[string]any, 0, len(records))
 	for i := range records {
-		out = append(out, quotaview.LazyZeroQuotaForResponse(records[i], now, true))
+		out = append(out, quotaview.LazyZeroQuotaForResponse(records[i], h.quotaWindows(records[i].Platform, now), now, true))
 	}
 	response.Success(c, map[string]any{"platform_quotas": out})
 }

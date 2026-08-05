@@ -202,6 +202,7 @@ func ProvideAccountUsageService(
 	identityCache IdentityCache,
 	tlsFPProfileService *TLSFingerprintProfileService,
 	openAIGatewayService *OpenAIGatewayService,
+	quotaWindowSync *QuotaWindowSyncService,
 ) *AccountUsageService {
 	service := NewAccountUsageService(
 		accountRepo,
@@ -217,6 +218,8 @@ func ProvideAccountUsageService(
 		tlsFPProfileService,
 	)
 	service.agentIdentityWS = openAIGatewayService
+	// 校准基准账号窗口后要立刻刷新快照，否则 enforcement 最长 15s 内仍按旧边界判定。
+	service.SetQuotaWindowSync(quotaWindowSync)
 	return service
 }
 
@@ -726,6 +729,27 @@ func ProvideBillingCacheService(
 	return NewBillingCacheService(cache, userRepo, subRepo, apiKeyRepo, rpmCache, rateRepo, cfg, userPlatformQuotaRepo)
 }
 
+// ProvideQuotaWindowSyncService 创建并启动「用量基准账号」窗口同步服务，
+// 并把自己注入 BillingCacheService 作为窗口解析器。
+//
+// 依赖方向刻意做成「后构造者推给先构造者」：BillingCacheService 位于依赖图很上游
+// （APIKeyService 等一大票服务依赖它），而本服务需要 AccountRepository 与
+// TimingWheel，两者都在它之后才具备。反过来让 BillingCacheService 依赖本服务会
+// 迫使整张图重排。
+func ProvideQuotaWindowSyncService(
+	settingRepo SettingRepository,
+	accountRepo AccountRepository,
+	tw *TimingWheelService,
+	billingCacheService *BillingCacheService,
+) *QuotaWindowSyncService {
+	svc := NewQuotaWindowSyncService(settingRepo, accountRepo, tw)
+	// 5h/周 窗口边界的唯一来源：enforcement 与计费写入都经由 BillingCacheService
+	// 取窗口，保证两侧永远用同一份边界。
+	billingCacheService.SetQuotaWindowResolver(svc)
+	svc.Start()
+	return svc
+}
+
 // ProvideAPIKeyService wires APIKeyService and connects rate-limit cache invalidation.
 func ProvideAPIKeyService(
 	apiKeyRepo APIKeyRepository,
@@ -865,6 +889,7 @@ var ProviderSet = wire.NewSet(
 	ProvideChannelMonitorV2Aggregator,
 	NewChannelMonitorRequestTemplateService,
 	ProvideUserPlatformQuotaUsageFlusher,
+	ProvideQuotaWindowSyncService,
 )
 
 // ProvideUserPlatformQuotaUsageFlusher 创建并启动 UserPlatformQuotaUsageFlusher。

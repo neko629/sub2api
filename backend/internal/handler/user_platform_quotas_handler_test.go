@@ -123,7 +123,7 @@ func TestLazyZeroQuotaForResponse_UserViewStripsWindowStart(t *testing.T) {
 		DailyUsageUSD:    1.0,
 		DailyWindowStart: &start,
 	}
-	out := quotaview.LazyZeroQuotaForResponse(r, time.Now().UTC(), false)
+	out := quotaview.LazyZeroQuotaForResponse(r, service.LocalQuotaWindows(time.Now().UTC()), time.Now().UTC(), false)
 	if _, ok := out["daily_window_start"]; ok {
 		t.Error("user view should not include daily_window_start")
 	}
@@ -135,7 +135,7 @@ func TestLazyZeroQuotaForResponse_AdminViewIncludesWindowStart(t *testing.T) {
 		Platform:         "anthropic",
 		DailyWindowStart: &start,
 	}
-	out := quotaview.LazyZeroQuotaForResponse(r, time.Now().UTC(), true)
+	out := quotaview.LazyZeroQuotaForResponse(r, service.LocalQuotaWindows(time.Now().UTC()), time.Now().UTC(), true)
 	if _, ok := out["daily_window_start"]; !ok {
 		t.Error("admin view should include daily_window_start")
 	}
@@ -151,7 +151,7 @@ func TestLazyZeroQuotaForResponse_ActiveWindowPreservesUsage(t *testing.T) {
 		DailyUsageUSD:    usage,
 		DailyWindowStart: &today,
 	}
-	out := quotaview.LazyZeroQuotaForResponse(r, now, false)
+	out := quotaview.LazyZeroQuotaForResponse(r, service.LocalQuotaWindows(now), now, false)
 	if out["daily_usage_usd"] != usage {
 		t.Errorf("expected daily_usage_usd=%v, got %v", usage, out["daily_usage_usd"])
 	}
@@ -161,52 +161,68 @@ func TestLazyZeroQuotaForResponse_ActiveWindowPreservesUsage(t *testing.T) {
 	}
 }
 
-func TestNeedsDailyReset_NilStart_ReturnsFalse(t *testing.T) {
-	if quotaview.NeedsDailyReset(nil, time.Now().UTC()) {
-		t.Error("nil start should not need reset")
+// 窗口过期判定原本由 quotaview 自己的谓词实现，现已统一到
+// service.ResolvedQuotaWindow（见 quota_window_resolver_test.go）。
+// 这里保留的是「透过响应视图能观察到的」语义，避免只测内部谓词而漏掉接线。
+
+func TestLazyZeroQuotaForResponse_ExpiredDailyWindowZeroesUsage(t *testing.T) {
+	now := time.Now().UTC()
+	yesterday := timezone.StartOfDay(now).AddDate(0, 0, -1)
+	r := service.UserPlatformQuotaRecord{
+		Platform:         "openai",
+		DailyUsageUSD:    7.5,
+		DailyWindowStart: &yesterday,
+	}
+	out := quotaview.LazyZeroQuotaForResponse(r, service.LocalQuotaWindows(now), now, false)
+	if out["daily_usage_usd"] != 0.0 {
+		t.Errorf("expired daily window should report 0 usage, got %v", out["daily_usage_usd"])
+	}
+	// 注意：map[string]any 里存的是 *string，值为 nil 时接口本身仍非 nil
+	// （典型的 typed-nil 陷阱），必须断言到具体类型再比较。
+	if v, _ := out["daily_window_resets_at"].(*string); v != nil {
+		t.Errorf("expired window should not carry resets_at, got %q", *v)
 	}
 }
 
-func TestNeedsDailyReset_OldStart_ReturnsTrue(t *testing.T) {
-	old := time.Now().UTC().AddDate(0, 0, -1)
-	if !quotaview.NeedsDailyReset(&old, time.Now().UTC()) {
-		t.Error("yesterday start should need daily reset")
+// 月窗口是 30 天滚动，不是自然月：跨月但不足 30 天不得重置。
+func TestLazyZeroQuotaForResponse_MonthlyIs30DayRolling(t *testing.T) {
+	tests := []struct {
+		name      string
+		start     time.Time
+		now       time.Time
+		wantUsage float64
+	}{
+		{
+			name:      "31 天前的窗口已过期",
+			start:     time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+			now:       time.Date(2026, 5, 2, 0, 0, 0, 0, time.UTC),
+			wantUsage: 0,
+		},
+		{
+			name:      "15 天前的窗口仍有效",
+			start:     time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC),
+			now:       time.Date(2026, 5, 5, 0, 0, 0, 0, time.UTC),
+			wantUsage: 4.25,
+		},
+		{
+			name:      "跨自然月但不足 30 天不重置",
+			start:     time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC),
+			now:       time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+			wantUsage: 4.25,
+		},
 	}
-}
-
-func TestNeedsWeeklyReset_NilStart_ReturnsFalse(t *testing.T) {
-	if quotaview.NeedsWeeklyReset(nil, time.Now().UTC()) {
-		t.Error("nil start should not need weekly reset")
-	}
-}
-
-func TestNeedsMonthlyReset_NilStart_ReturnsFalse(t *testing.T) {
-	if quotaview.NeedsMonthlyReset(nil, time.Now().UTC()) {
-		t.Error("nil start should not need monthly reset")
-	}
-}
-
-// TestNeedsMonthlyReset_30DayRolling 验证 30 天滚动语义（C-NEW-1）。
-func TestNeedsMonthlyReset_30DayRolling_Expired(t *testing.T) {
-	start := time.Now().UTC().Add(-31 * 24 * time.Hour) // 31 天前，已过期
-	if !quotaview.NeedsMonthlyReset(&start, time.Now().UTC()) {
-		t.Error("31 days ago should need monthly reset (30-day rolling)")
-	}
-}
-
-func TestNeedsMonthlyReset_30DayRolling_Active(t *testing.T) {
-	start := time.Now().UTC().Add(-15 * 24 * time.Hour) // 15 天前，窗口有效
-	if quotaview.NeedsMonthlyReset(&start, time.Now().UTC()) {
-		t.Error("15 days ago should NOT need monthly reset (30-day rolling, still active)")
-	}
-}
-
-// TestNeedsMonthlyReset_CrossMonthBoundary 验证跨自然月时 30 天未满不重置（旧自然月语义会提前重置）。
-func TestNeedsMonthlyReset_CrossMonthBoundary(t *testing.T) {
-	// 窗口起始 4 月 20 日；5 月 1 日仅过了 11 天，不足 30 天，不应重置
-	windowStart := time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)
-	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
-	if quotaview.NeedsMonthlyReset(&windowStart, now) {
-		t.Error("cross-month boundary within 30 days should NOT trigger reset (30-day rolling)")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			start := tc.start
+			r := service.UserPlatformQuotaRecord{
+				Platform:           "openai",
+				MonthlyUsageUSD:    4.25,
+				MonthlyWindowStart: &start,
+			}
+			out := quotaview.LazyZeroQuotaForResponse(r, service.LocalQuotaWindows(tc.now), tc.now, false)
+			if out["monthly_usage_usd"] != tc.wantUsage {
+				t.Errorf("monthly_usage_usd = %v, want %v", out["monthly_usage_usd"], tc.wantUsage)
+			}
+		})
 	}
 }

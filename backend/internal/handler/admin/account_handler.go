@@ -2335,6 +2335,52 @@ func (h *AccountHandler) GetUsage(c *gin.Context) {
 	response.Success(c, usage)
 }
 
+// CalibrateUsageWindowRequest is the body for POST /admin/accounts/:id/calibrate-usage-window.
+type CalibrateUsageWindowRequest struct {
+	Window     string    `json:"window" binding:"required"` // "5h" | "7d" | "7d_oi"
+	ResetsAt   time.Time `json:"resets_at" binding:"required"`
+	ResetUsage bool      `json:"reset_usage"`
+}
+
+// CalibrateUsageWindow 手动校正账号 5h / 7d / 7d_oi 窗口的刷新时刻。
+// POST /api/v1/admin/accounts/:id/calibrate-usage-window
+//
+// 注意：若该账号被设为某平台的「用量基准账号」，此操作会同时平移所有用户的
+// 5h / 周限额窗口并使当前窗口用量作废 —— 前端需要二次确认。
+func (h *AccountHandler) CalibrateUsageWindow(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+
+	var req CalibrateUsageWindowRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	ctx := c.Request.Context()
+	if err := h.accountUsageService.CalibrateUsageWindow(ctx, accountID, req.Window, req.ResetsAt, req.ResetUsage); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	slog.Info("admin.account_usage_window_calibrated",
+		"actor_admin_id", getAdminIDFromContext(c),
+		"account_id", accountID,
+		"window", req.Window,
+		"resets_at", req.ResetsAt,
+		"reset_usage", req.ResetUsage)
+
+	account, err := h.adminService.GetAccount(ctx, accountID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, h.buildAccountResponseWithRuntime(ctx, account))
+}
+
 // ClearRateLimit handles clearing account rate limit status
 // POST /api/v1/admin/accounts/:id/clear-rate-limit
 func (h *AccountHandler) ClearRateLimit(c *gin.Context) {

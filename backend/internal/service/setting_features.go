@@ -1145,6 +1145,37 @@ func (s *SettingService) GetAccountSchedulingThresholds(ctx context.Context) map
 	return defaultAccountSchedulingThresholds()
 }
 
+// GetQuotaReferenceAccounts 读取「用量基准账号」设置：platform → accountID。
+// 返回空 map 表示未配置任何基准账号 —— 此时 5h 退回滚动窗口、周退回自然周，
+// 行为与该特性引入前完全一致。
+func (s *SettingService) GetQuotaReferenceAccounts(ctx context.Context) map[string]int64 {
+	raw, err := s.settingRepo.GetValue(ctx, SettingKeyQuotaReferenceAccounts)
+	if err != nil {
+		// 未配置是默认状态，不是故障。
+		if !errors.Is(err, ErrSettingNotFound) {
+			slog.Warn("[Setting] read quota reference accounts failed (fail-open)", "error", err)
+		}
+		return map[string]int64{}
+	}
+	return ParseQuotaReferenceAccounts(raw)
+}
+
+// SetQuotaReferenceAccounts 写入「用量基准账号」设置。
+// accountID <= 0 或非法平台的条目会被丢弃（等同于该平台不指定基准账号）。
+func (s *SettingService) SetQuotaReferenceAccounts(ctx context.Context, refs map[string]int64) error {
+	clean := make(map[string]int64, len(refs))
+	for platform, id := range refs {
+		if id > 0 && IsAllowedQuotaPlatform(platform) {
+			clean[platform] = id
+		}
+	}
+	data, err := json.Marshal(clean)
+	if err != nil {
+		return fmt.Errorf("marshal quota reference accounts: %w", err)
+	}
+	return s.settingRepo.Set(ctx, SettingKeyQuotaReferenceAccounts, string(data))
+}
+
 // GetAuthSourcePlatformQuotas 读取指定 auth source 的 platform quota 覆盖（仅返回有配置的平台，override 语义）。
 func (s *SettingService) GetAuthSourcePlatformQuotas(ctx context.Context, source string) map[string]*DefaultPlatformQuotaSetting {
 	out := map[string]*DefaultPlatformQuotaSetting{}
@@ -1164,6 +1195,9 @@ func (s *SettingService) GetAuthSourcePlatformQuotas(ctx context.Context, source
 func mergePlatformQuotaDefaults(dst, src *DefaultPlatformQuotaSetting) {
 	if src == nil || dst == nil {
 		return
+	}
+	if src.FiveHourLimitUSD != nil {
+		dst.FiveHourLimitUSD = src.FiveHourLimitUSD
 	}
 	if src.DailyLimitUSD != nil {
 		dst.DailyLimitUSD = src.DailyLimitUSD

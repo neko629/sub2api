@@ -72,12 +72,14 @@ func flusherPtrTime(t time.Time) *time.Time { return &t }
 func makeEntry(daily, weekly, monthly float64) *UserPlatformQuotaCacheEntry {
 	now := time.Now().UTC()
 	return &UserPlatformQuotaCacheEntry{
-		DailyUsageUSD:      daily,
-		WeeklyUsageUSD:     weekly,
-		MonthlyUsageUSD:    monthly,
-		DailyWindowStart:   flusherPtrTime(now),
-		WeeklyWindowStart:  flusherPtrTime(now),
-		MonthlyWindowStart: flusherPtrTime(now),
+		FiveHourUsageUSD:    daily, // 5h 用量与 daily 同源累加，测试里取同值即可
+		DailyUsageUSD:       daily,
+		WeeklyUsageUSD:      weekly,
+		MonthlyUsageUSD:     monthly,
+		FiveHourWindowStart: flusherPtrTime(now),
+		DailyWindowStart:    flusherPtrTime(now),
+		WeeklyWindowStart:   flusherPtrTime(now),
+		MonthlyWindowStart:  flusherPtrTime(now),
 	}
 }
 

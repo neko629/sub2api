@@ -404,6 +404,10 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 	} else {
 		payload.DefaultPlatformQuotas = platformQuotas
 	}
+	payload.QuotaReferenceAccounts = h.settingService.GetQuotaReferenceAccounts(c.Request.Context())
+	if payload.QuotaReferenceAccounts == nil {
+		payload.QuotaReferenceAccounts = map[string]int64{}
+	}
 
 	response.Success(c, systemSettingsResponseData(payload, authSourceDefaults))
 }

@@ -40,9 +40,9 @@ type FlusherMetrics struct {
 // flusherMaxBatchesPerTick 单次 tick 最多消费的批数，防止 tick 执行时间过长。
 const flusherMaxBatchesPerTick = 16
 
-// maxFlushBatchSize 限制单批行数,必须 ≤ repository.BatchSnapshotUsage 的 batchRows(6000),
+// maxFlushBatchSize 限制单批行数,必须 ≤ repository.BatchSnapshotUsage 的 batchRows(5000),
 // 以保证单次 flush 的 snapshots 仅生成一条 UPSERT(单事务原子)。两处需手动保持一致。
-const maxFlushBatchSize = 6000
+const maxFlushBatchSize = 5000
 
 // defaultFlushBatchSize 是配置 flush_batch_size 非法(≤0)时的回退值。
 const defaultFlushBatchSize = 1000
@@ -150,18 +150,24 @@ func (s *UserPlatformQuotaUsageFlusher) flushOneBatch(parentCtx context.Context)
 		if e == nil {
 			continue
 		}
-		if e.DailyWindowStart == nil || e.WeeklyWindowStart == nil || e.MonthlyWindowStart == nil {
+		// 任一窗口起点缺失就跳过：snapshot 是绝对值覆盖写，用零值时间会把 DB 里
+		// 正确的窗口起点冲掉。缺失的起点会在下一次 preflight 由跨窗分支自愈补上，
+		// 该 key 仍在脏集中，下一轮 flush 即可正常写入。
+		if e.FiveHourWindowStart == nil || e.DailyWindowStart == nil ||
+			e.WeeklyWindowStart == nil || e.MonthlyWindowStart == nil {
 			continue
 		}
 		snaps = append(snaps, UserPlatformQuotaSnapshot{
-			UserID:             key.UserID,
-			Platform:           key.Platform,
-			DailyUsageUSD:      e.DailyUsageUSD,
-			WeeklyUsageUSD:     e.WeeklyUsageUSD,
-			MonthlyUsageUSD:    e.MonthlyUsageUSD,
-			DailyWindowStart:   *e.DailyWindowStart,
-			WeeklyWindowStart:  *e.WeeklyWindowStart,
-			MonthlyWindowStart: *e.MonthlyWindowStart,
+			UserID:              key.UserID,
+			Platform:            key.Platform,
+			FiveHourUsageUSD:    e.FiveHourUsageUSD,
+			DailyUsageUSD:       e.DailyUsageUSD,
+			WeeklyUsageUSD:      e.WeeklyUsageUSD,
+			MonthlyUsageUSD:     e.MonthlyUsageUSD,
+			FiveHourWindowStart: *e.FiveHourWindowStart,
+			DailyWindowStart:    *e.DailyWindowStart,
+			WeeklyWindowStart:   *e.WeeklyWindowStart,
+			MonthlyWindowStart:  *e.MonthlyWindowStart,
 		})
 	}
 

@@ -31,7 +31,7 @@ func (f *fakeInsertRecorder) BulkInsertInitial(ctx context.Context, recs []UserP
 	return nil
 }
 
-func (f *fakeInsertRecorder) IncrementUsageWithReset(_ context.Context, _ int64, _ string, _ float64, _ time.Time) error {
+func (f *fakeInsertRecorder) IncrementUsageWithReset(_ context.Context, _ int64, _ string, _ float64, _ time.Time, _ map[string]ResolvedQuotaWindow) error {
 	return nil
 }
 

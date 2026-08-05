@@ -304,6 +304,8 @@ type AccountUsageService struct {
 	tlsFPProfileService     *TLSFingerprintProfileService
 	agentIdentityTaskMu     sync.Mutex
 	agentIdentityWS         agentIdentityWSConnectionInvalidator
+	// quotaWindowSync 可选依赖：校准基准账号窗口后立即刷新用户限额窗口快照。
+	quotaWindowSync *QuotaWindowSyncService
 }
 
 // NewAccountUsageService 创建AccountUsageService实例

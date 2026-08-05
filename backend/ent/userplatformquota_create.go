@@ -77,6 +77,20 @@ func (_c *UserPlatformQuotaCreate) SetPlatform(v string) *UserPlatformQuotaCreat
 	return _c
 }
 
+// SetFiveHourLimitUsd sets the "five_hour_limit_usd" field.
+func (_c *UserPlatformQuotaCreate) SetFiveHourLimitUsd(v float64) *UserPlatformQuotaCreate {
+	_c.mutation.SetFiveHourLimitUsd(v)
+	return _c
+}
+
+// SetNillableFiveHourLimitUsd sets the "five_hour_limit_usd" field if the given value is not nil.
+func (_c *UserPlatformQuotaCreate) SetNillableFiveHourLimitUsd(v *float64) *UserPlatformQuotaCreate {
+	if v != nil {
+		_c.SetFiveHourLimitUsd(*v)
+	}
+	return _c
+}
+
 // SetDailyLimitUsd sets the "daily_limit_usd" field.
 func (_c *UserPlatformQuotaCreate) SetDailyLimitUsd(v float64) *UserPlatformQuotaCreate {
 	_c.mutation.SetDailyLimitUsd(v)
@@ -119,6 +133,20 @@ func (_c *UserPlatformQuotaCreate) SetNillableMonthlyLimitUsd(v *float64) *UserP
 	return _c
 }
 
+// SetFiveHourUsageUsd sets the "five_hour_usage_usd" field.
+func (_c *UserPlatformQuotaCreate) SetFiveHourUsageUsd(v float64) *UserPlatformQuotaCreate {
+	_c.mutation.SetFiveHourUsageUsd(v)
+	return _c
+}
+
+// SetNillableFiveHourUsageUsd sets the "five_hour_usage_usd" field if the given value is not nil.
+func (_c *UserPlatformQuotaCreate) SetNillableFiveHourUsageUsd(v *float64) *UserPlatformQuotaCreate {
+	if v != nil {
+		_c.SetFiveHourUsageUsd(*v)
+	}
+	return _c
+}
+
 // SetDailyUsageUsd sets the "daily_usage_usd" field.
 func (_c *UserPlatformQuotaCreate) SetDailyUsageUsd(v float64) *UserPlatformQuotaCreate {
 	_c.mutation.SetDailyUsageUsd(v)
@@ -157,6 +185,20 @@ func (_c *UserPlatformQuotaCreate) SetMonthlyUsageUsd(v float64) *UserPlatformQu
 func (_c *UserPlatformQuotaCreate) SetNillableMonthlyUsageUsd(v *float64) *UserPlatformQuotaCreate {
 	if v != nil {
 		_c.SetMonthlyUsageUsd(*v)
+	}
+	return _c
+}
+
+// SetFiveHourWindowStart sets the "five_hour_window_start" field.
+func (_c *UserPlatformQuotaCreate) SetFiveHourWindowStart(v time.Time) *UserPlatformQuotaCreate {
+	_c.mutation.SetFiveHourWindowStart(v)
+	return _c
+}
+
+// SetNillableFiveHourWindowStart sets the "five_hour_window_start" field if the given value is not nil.
+func (_c *UserPlatformQuotaCreate) SetNillableFiveHourWindowStart(v *time.Time) *UserPlatformQuotaCreate {
+	if v != nil {
+		_c.SetFiveHourWindowStart(*v)
 	}
 	return _c
 }
@@ -259,6 +301,10 @@ func (_c *UserPlatformQuotaCreate) defaults() error {
 		v := userplatformquota.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.FiveHourUsageUsd(); !ok {
+		v := userplatformquota.DefaultFiveHourUsageUsd
+		_c.mutation.SetFiveHourUsageUsd(v)
+	}
 	if _, ok := _c.mutation.DailyUsageUsd(); !ok {
 		v := userplatformquota.DefaultDailyUsageUsd
 		_c.mutation.SetDailyUsageUsd(v)
@@ -292,6 +338,9 @@ func (_c *UserPlatformQuotaCreate) check() error {
 		if err := userplatformquota.PlatformValidator(v); err != nil {
 			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "UserPlatformQuota.platform": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.FiveHourUsageUsd(); !ok {
+		return &ValidationError{Name: "five_hour_usage_usd", err: errors.New(`ent: missing required field "UserPlatformQuota.five_hour_usage_usd"`)}
 	}
 	if _, ok := _c.mutation.DailyUsageUsd(); !ok {
 		return &ValidationError{Name: "daily_usage_usd", err: errors.New(`ent: missing required field "UserPlatformQuota.daily_usage_usd"`)}
@@ -348,6 +397,10 @@ func (_c *UserPlatformQuotaCreate) createSpec() (*UserPlatformQuota, *sqlgraph.C
 		_spec.SetField(userplatformquota.FieldPlatform, field.TypeString, value)
 		_node.Platform = value
 	}
+	if value, ok := _c.mutation.FiveHourLimitUsd(); ok {
+		_spec.SetField(userplatformquota.FieldFiveHourLimitUsd, field.TypeFloat64, value)
+		_node.FiveHourLimitUsd = &value
+	}
 	if value, ok := _c.mutation.DailyLimitUsd(); ok {
 		_spec.SetField(userplatformquota.FieldDailyLimitUsd, field.TypeFloat64, value)
 		_node.DailyLimitUsd = &value
@@ -360,6 +413,10 @@ func (_c *UserPlatformQuotaCreate) createSpec() (*UserPlatformQuota, *sqlgraph.C
 		_spec.SetField(userplatformquota.FieldMonthlyLimitUsd, field.TypeFloat64, value)
 		_node.MonthlyLimitUsd = &value
 	}
+	if value, ok := _c.mutation.FiveHourUsageUsd(); ok {
+		_spec.SetField(userplatformquota.FieldFiveHourUsageUsd, field.TypeFloat64, value)
+		_node.FiveHourUsageUsd = value
+	}
 	if value, ok := _c.mutation.DailyUsageUsd(); ok {
 		_spec.SetField(userplatformquota.FieldDailyUsageUsd, field.TypeFloat64, value)
 		_node.DailyUsageUsd = value
@@ -371,6 +428,10 @@ func (_c *UserPlatformQuotaCreate) createSpec() (*UserPlatformQuota, *sqlgraph.C
 	if value, ok := _c.mutation.MonthlyUsageUsd(); ok {
 		_spec.SetField(userplatformquota.FieldMonthlyUsageUsd, field.TypeFloat64, value)
 		_node.MonthlyUsageUsd = value
+	}
+	if value, ok := _c.mutation.FiveHourWindowStart(); ok {
+		_spec.SetField(userplatformquota.FieldFiveHourWindowStart, field.TypeTime, value)
+		_node.FiveHourWindowStart = &value
 	}
 	if value, ok := _c.mutation.DailyWindowStart(); ok {
 		_spec.SetField(userplatformquota.FieldDailyWindowStart, field.TypeTime, value)
@@ -507,6 +568,30 @@ func (u *UserPlatformQuotaUpsert) UpdatePlatform() *UserPlatformQuotaUpsert {
 	return u
 }
 
+// SetFiveHourLimitUsd sets the "five_hour_limit_usd" field.
+func (u *UserPlatformQuotaUpsert) SetFiveHourLimitUsd(v float64) *UserPlatformQuotaUpsert {
+	u.Set(userplatformquota.FieldFiveHourLimitUsd, v)
+	return u
+}
+
+// UpdateFiveHourLimitUsd sets the "five_hour_limit_usd" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsert) UpdateFiveHourLimitUsd() *UserPlatformQuotaUpsert {
+	u.SetExcluded(userplatformquota.FieldFiveHourLimitUsd)
+	return u
+}
+
+// AddFiveHourLimitUsd adds v to the "five_hour_limit_usd" field.
+func (u *UserPlatformQuotaUpsert) AddFiveHourLimitUsd(v float64) *UserPlatformQuotaUpsert {
+	u.Add(userplatformquota.FieldFiveHourLimitUsd, v)
+	return u
+}
+
+// ClearFiveHourLimitUsd clears the value of the "five_hour_limit_usd" field.
+func (u *UserPlatformQuotaUpsert) ClearFiveHourLimitUsd() *UserPlatformQuotaUpsert {
+	u.SetNull(userplatformquota.FieldFiveHourLimitUsd)
+	return u
+}
+
 // SetDailyLimitUsd sets the "daily_limit_usd" field.
 func (u *UserPlatformQuotaUpsert) SetDailyLimitUsd(v float64) *UserPlatformQuotaUpsert {
 	u.Set(userplatformquota.FieldDailyLimitUsd, v)
@@ -579,6 +664,24 @@ func (u *UserPlatformQuotaUpsert) ClearMonthlyLimitUsd() *UserPlatformQuotaUpser
 	return u
 }
 
+// SetFiveHourUsageUsd sets the "five_hour_usage_usd" field.
+func (u *UserPlatformQuotaUpsert) SetFiveHourUsageUsd(v float64) *UserPlatformQuotaUpsert {
+	u.Set(userplatformquota.FieldFiveHourUsageUsd, v)
+	return u
+}
+
+// UpdateFiveHourUsageUsd sets the "five_hour_usage_usd" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsert) UpdateFiveHourUsageUsd() *UserPlatformQuotaUpsert {
+	u.SetExcluded(userplatformquota.FieldFiveHourUsageUsd)
+	return u
+}
+
+// AddFiveHourUsageUsd adds v to the "five_hour_usage_usd" field.
+func (u *UserPlatformQuotaUpsert) AddFiveHourUsageUsd(v float64) *UserPlatformQuotaUpsert {
+	u.Add(userplatformquota.FieldFiveHourUsageUsd, v)
+	return u
+}
+
 // SetDailyUsageUsd sets the "daily_usage_usd" field.
 func (u *UserPlatformQuotaUpsert) SetDailyUsageUsd(v float64) *UserPlatformQuotaUpsert {
 	u.Set(userplatformquota.FieldDailyUsageUsd, v)
@@ -630,6 +733,24 @@ func (u *UserPlatformQuotaUpsert) UpdateMonthlyUsageUsd() *UserPlatformQuotaUpse
 // AddMonthlyUsageUsd adds v to the "monthly_usage_usd" field.
 func (u *UserPlatformQuotaUpsert) AddMonthlyUsageUsd(v float64) *UserPlatformQuotaUpsert {
 	u.Add(userplatformquota.FieldMonthlyUsageUsd, v)
+	return u
+}
+
+// SetFiveHourWindowStart sets the "five_hour_window_start" field.
+func (u *UserPlatformQuotaUpsert) SetFiveHourWindowStart(v time.Time) *UserPlatformQuotaUpsert {
+	u.Set(userplatformquota.FieldFiveHourWindowStart, v)
+	return u
+}
+
+// UpdateFiveHourWindowStart sets the "five_hour_window_start" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsert) UpdateFiveHourWindowStart() *UserPlatformQuotaUpsert {
+	u.SetExcluded(userplatformquota.FieldFiveHourWindowStart)
+	return u
+}
+
+// ClearFiveHourWindowStart clears the value of the "five_hour_window_start" field.
+func (u *UserPlatformQuotaUpsert) ClearFiveHourWindowStart() *UserPlatformQuotaUpsert {
+	u.SetNull(userplatformquota.FieldFiveHourWindowStart)
 	return u
 }
 
@@ -795,6 +916,34 @@ func (u *UserPlatformQuotaUpsertOne) UpdatePlatform() *UserPlatformQuotaUpsertOn
 	})
 }
 
+// SetFiveHourLimitUsd sets the "five_hour_limit_usd" field.
+func (u *UserPlatformQuotaUpsertOne) SetFiveHourLimitUsd(v float64) *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.SetFiveHourLimitUsd(v)
+	})
+}
+
+// AddFiveHourLimitUsd adds v to the "five_hour_limit_usd" field.
+func (u *UserPlatformQuotaUpsertOne) AddFiveHourLimitUsd(v float64) *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.AddFiveHourLimitUsd(v)
+	})
+}
+
+// UpdateFiveHourLimitUsd sets the "five_hour_limit_usd" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsertOne) UpdateFiveHourLimitUsd() *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.UpdateFiveHourLimitUsd()
+	})
+}
+
+// ClearFiveHourLimitUsd clears the value of the "five_hour_limit_usd" field.
+func (u *UserPlatformQuotaUpsertOne) ClearFiveHourLimitUsd() *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.ClearFiveHourLimitUsd()
+	})
+}
+
 // SetDailyLimitUsd sets the "daily_limit_usd" field.
 func (u *UserPlatformQuotaUpsertOne) SetDailyLimitUsd(v float64) *UserPlatformQuotaUpsertOne {
 	return u.Update(func(s *UserPlatformQuotaUpsert) {
@@ -879,6 +1028,27 @@ func (u *UserPlatformQuotaUpsertOne) ClearMonthlyLimitUsd() *UserPlatformQuotaUp
 	})
 }
 
+// SetFiveHourUsageUsd sets the "five_hour_usage_usd" field.
+func (u *UserPlatformQuotaUpsertOne) SetFiveHourUsageUsd(v float64) *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.SetFiveHourUsageUsd(v)
+	})
+}
+
+// AddFiveHourUsageUsd adds v to the "five_hour_usage_usd" field.
+func (u *UserPlatformQuotaUpsertOne) AddFiveHourUsageUsd(v float64) *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.AddFiveHourUsageUsd(v)
+	})
+}
+
+// UpdateFiveHourUsageUsd sets the "five_hour_usage_usd" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsertOne) UpdateFiveHourUsageUsd() *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.UpdateFiveHourUsageUsd()
+	})
+}
+
 // SetDailyUsageUsd sets the "daily_usage_usd" field.
 func (u *UserPlatformQuotaUpsertOne) SetDailyUsageUsd(v float64) *UserPlatformQuotaUpsertOne {
 	return u.Update(func(s *UserPlatformQuotaUpsert) {
@@ -939,6 +1109,27 @@ func (u *UserPlatformQuotaUpsertOne) AddMonthlyUsageUsd(v float64) *UserPlatform
 func (u *UserPlatformQuotaUpsertOne) UpdateMonthlyUsageUsd() *UserPlatformQuotaUpsertOne {
 	return u.Update(func(s *UserPlatformQuotaUpsert) {
 		s.UpdateMonthlyUsageUsd()
+	})
+}
+
+// SetFiveHourWindowStart sets the "five_hour_window_start" field.
+func (u *UserPlatformQuotaUpsertOne) SetFiveHourWindowStart(v time.Time) *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.SetFiveHourWindowStart(v)
+	})
+}
+
+// UpdateFiveHourWindowStart sets the "five_hour_window_start" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsertOne) UpdateFiveHourWindowStart() *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.UpdateFiveHourWindowStart()
+	})
+}
+
+// ClearFiveHourWindowStart clears the value of the "five_hour_window_start" field.
+func (u *UserPlatformQuotaUpsertOne) ClearFiveHourWindowStart() *UserPlatformQuotaUpsertOne {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.ClearFiveHourWindowStart()
 	})
 }
 
@@ -1279,6 +1470,34 @@ func (u *UserPlatformQuotaUpsertBulk) UpdatePlatform() *UserPlatformQuotaUpsertB
 	})
 }
 
+// SetFiveHourLimitUsd sets the "five_hour_limit_usd" field.
+func (u *UserPlatformQuotaUpsertBulk) SetFiveHourLimitUsd(v float64) *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.SetFiveHourLimitUsd(v)
+	})
+}
+
+// AddFiveHourLimitUsd adds v to the "five_hour_limit_usd" field.
+func (u *UserPlatformQuotaUpsertBulk) AddFiveHourLimitUsd(v float64) *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.AddFiveHourLimitUsd(v)
+	})
+}
+
+// UpdateFiveHourLimitUsd sets the "five_hour_limit_usd" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsertBulk) UpdateFiveHourLimitUsd() *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.UpdateFiveHourLimitUsd()
+	})
+}
+
+// ClearFiveHourLimitUsd clears the value of the "five_hour_limit_usd" field.
+func (u *UserPlatformQuotaUpsertBulk) ClearFiveHourLimitUsd() *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.ClearFiveHourLimitUsd()
+	})
+}
+
 // SetDailyLimitUsd sets the "daily_limit_usd" field.
 func (u *UserPlatformQuotaUpsertBulk) SetDailyLimitUsd(v float64) *UserPlatformQuotaUpsertBulk {
 	return u.Update(func(s *UserPlatformQuotaUpsert) {
@@ -1363,6 +1582,27 @@ func (u *UserPlatformQuotaUpsertBulk) ClearMonthlyLimitUsd() *UserPlatformQuotaU
 	})
 }
 
+// SetFiveHourUsageUsd sets the "five_hour_usage_usd" field.
+func (u *UserPlatformQuotaUpsertBulk) SetFiveHourUsageUsd(v float64) *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.SetFiveHourUsageUsd(v)
+	})
+}
+
+// AddFiveHourUsageUsd adds v to the "five_hour_usage_usd" field.
+func (u *UserPlatformQuotaUpsertBulk) AddFiveHourUsageUsd(v float64) *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.AddFiveHourUsageUsd(v)
+	})
+}
+
+// UpdateFiveHourUsageUsd sets the "five_hour_usage_usd" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsertBulk) UpdateFiveHourUsageUsd() *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.UpdateFiveHourUsageUsd()
+	})
+}
+
 // SetDailyUsageUsd sets the "daily_usage_usd" field.
 func (u *UserPlatformQuotaUpsertBulk) SetDailyUsageUsd(v float64) *UserPlatformQuotaUpsertBulk {
 	return u.Update(func(s *UserPlatformQuotaUpsert) {
@@ -1423,6 +1663,27 @@ func (u *UserPlatformQuotaUpsertBulk) AddMonthlyUsageUsd(v float64) *UserPlatfor
 func (u *UserPlatformQuotaUpsertBulk) UpdateMonthlyUsageUsd() *UserPlatformQuotaUpsertBulk {
 	return u.Update(func(s *UserPlatformQuotaUpsert) {
 		s.UpdateMonthlyUsageUsd()
+	})
+}
+
+// SetFiveHourWindowStart sets the "five_hour_window_start" field.
+func (u *UserPlatformQuotaUpsertBulk) SetFiveHourWindowStart(v time.Time) *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.SetFiveHourWindowStart(v)
+	})
+}
+
+// UpdateFiveHourWindowStart sets the "five_hour_window_start" field to the value that was provided on create.
+func (u *UserPlatformQuotaUpsertBulk) UpdateFiveHourWindowStart() *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.UpdateFiveHourWindowStart()
+	})
+}
+
+// ClearFiveHourWindowStart clears the value of the "five_hour_window_start" field.
+func (u *UserPlatformQuotaUpsertBulk) ClearFiveHourWindowStart() *UserPlatformQuotaUpsertBulk {
+	return u.Update(func(s *UserPlatformQuotaUpsert) {
+		s.ClearFiveHourWindowStart()
 	})
 }
 

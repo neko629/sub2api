@@ -97,7 +97,7 @@ func (s *userPlatformQuotaRepoStub) ListByUser(context.Context, int64) ([]UserPl
 	panic("unexpected ListByUser call")
 }
 
-func (s *userPlatformQuotaRepoStub) IncrementUsageWithReset(context.Context, int64, string, float64, time.Time) error {
+func (s *userPlatformQuotaRepoStub) IncrementUsageWithReset(context.Context, int64, string, float64, time.Time, map[string]ResolvedQuotaWindow) error {
 	panic("unexpected IncrementUsageWithReset call")
 }
 

@@ -48,10 +48,18 @@ func (UserPlatformQuota) Fields() []ent.Field {
 				}
 			}),
 
-		// 日 / 周 / 月 USD 上限：
+		// 5h / 日 / 周 / 月 USD 上限：
 		//   nil / not set → 无限额（完全放行）
 		//   0            → 完全禁用（任何请求都会被拒绝，因为 usage >= 0 恒成立）
 		//   > 0          → USD 限额上限
+		//
+		// 5h 与周窗口的边界可跟随「用量基准账号」的真实上游窗口（见
+		// service/quota_window_resolver.go）；未配置基准账号时 5h 退回滚动窗口、
+		// 周退回自然周，行为与本字段引入前完全一致。
+		field.Float("five_hour_limit_usd").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
 		field.Float("daily_limit_usd").
 			Optional().
 			Nillable().
@@ -66,6 +74,9 @@ func (UserPlatformQuota) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
 
 		// 当前窗口已用量（USD，preflight 时与 limit 比较）
+		field.Float("five_hour_usage_usd").
+			Default(0).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
 		field.Float("daily_usage_usd").
 			Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
@@ -77,6 +88,10 @@ func (UserPlatformQuota) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
 
 		// 窗口起点（NULL = 首次还未初始化，由 InitWindowStarts 用 COALESCE 兜底）
+		field.Time("five_hour_window_start").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 		field.Time("daily_window_start").
 			Optional().
 			Nillable().

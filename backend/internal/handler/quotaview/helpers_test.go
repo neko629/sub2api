@@ -8,35 +8,23 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
-// TestNextMonthlyResetTimeFrom_FromStart 验证：start 已知时返回 start+30d，不随 now 漂移。
-func TestNextMonthlyResetTimeFrom_FromStart(t *testing.T) {
-	t0 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	now := t0.Add(15 * 24 * time.Hour)  // t0 + 15d
-	want := t0.Add(30 * 24 * time.Hour) // t0 + 30d
-
-	got := NextMonthlyResetTimeFrom(&t0, now)
-	if !got.Equal(want) {
-		t.Errorf("NextMonthlyResetTimeFrom: want %v, got %v", want, got)
+// resetsAtOf 取出响应里某档的 *_window_resets_at，未设置时返回 ""。
+func resetsAtOf(out map[string]any, key string) string {
+	v, ok := out[key]
+	if !ok || v == nil {
+		return ""
 	}
+	s, ok := v.(*string)
+	if !ok || s == nil {
+		return ""
+	}
+	return *s
 }
 
-// TestNextMonthlyResetTimeFrom_NilStart 验证：start=nil 时退化为 now+30d（不 panic）。
-func TestNextMonthlyResetTimeFrom_NilStart(t *testing.T) {
-	now := time.Date(2024, 3, 15, 12, 0, 0, 0, time.UTC)
-	want := now.Add(30 * 24 * time.Hour)
-
-	got := NextMonthlyResetTimeFrom(nil, now)
-	if !got.Equal(want) {
-		t.Errorf("NextMonthlyResetTimeFrom(nil): want %v, got %v", want, got)
-	}
-}
-
-// TestLazyZeroQuotaForResponse_MonthlyResetsAt_NotDrifting 验证：
-// 连续两次以不同 now 调用、但 MonthlyWindowStart 相同的 record，
-// monthly_window_resets_at 始终等于 windowStart+30d，不随 now 漂移。
+// 月窗口是 30 天滚动：resetsAt 必须锚在 windowStart+30d，不随 now 漂移。
 func TestLazyZeroQuotaForResponse_MonthlyResetsAt_NotDrifting(t *testing.T) {
 	windowStart := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	wantResetsAt := windowStart.Add(30 * 24 * time.Hour).Format(time.RFC3339)
+	want := windowStart.Add(30 * 24 * time.Hour).Format(time.RFC3339)
 
 	r := service.UserPlatformQuotaRecord{
 		Platform:           "openai",
@@ -44,44 +32,17 @@ func TestLazyZeroQuotaForResponse_MonthlyResetsAt_NotDrifting(t *testing.T) {
 		MonthlyWindowStart: &windowStart,
 	}
 
-	// 第一次调用：now = windowStart + 5d
-	now1 := windowStart.Add(5 * 24 * time.Hour)
-	out1 := LazyZeroQuotaForResponse(r, now1, false)
-	resetsAt1, ok1 := out1["monthly_window_resets_at"]
-	if !ok1 || resetsAt1 == nil {
-		t.Fatal("first call: monthly_window_resets_at should be set for active window")
-	}
-	s1, ok := resetsAt1.(*string)
-	if !ok || s1 == nil {
-		t.Fatalf("first call: monthly_window_resets_at should be *string, got %T", resetsAt1)
-	}
-	if *s1 != wantResetsAt {
-		t.Errorf("first call: want %s, got %s", wantResetsAt, *s1)
-	}
-
-	// 第二次调用：now = windowStart + 10d（不同 now，但 resetsAt 应不变）
-	now2 := windowStart.Add(10 * 24 * time.Hour)
-	out2 := LazyZeroQuotaForResponse(r, now2, false)
-	resetsAt2, ok2 := out2["monthly_window_resets_at"]
-	if !ok2 || resetsAt2 == nil {
-		t.Fatal("second call: monthly_window_resets_at should be set for active window")
-	}
-	s2, ok := resetsAt2.(*string)
-	if !ok || s2 == nil {
-		t.Fatalf("second call: monthly_window_resets_at should be *string, got %T", resetsAt2)
-	}
-	if *s2 != wantResetsAt {
-		t.Errorf("second call: want %s, got %s", wantResetsAt, *s2)
-	}
-
-	// 两次结果必须相等
-	if *s1 != *s2 {
-		t.Errorf("resetsAt drifted between calls: %s vs %s", *s1, *s2)
+	for _, offset := range []time.Duration{5 * 24 * time.Hour, 10 * 24 * time.Hour} {
+		now := windowStart.Add(offset)
+		out := LazyZeroQuotaForResponse(r, service.LocalQuotaWindows(now), now, false)
+		if got := resetsAtOf(out, "monthly_window_resets_at"); got != want {
+			t.Errorf("now=windowStart+%v: monthly_window_resets_at = %q, want %q", offset, got, want)
+		}
 	}
 }
 
-// TestNeedsDailyReset_FollowsServerTimezone 验证日窗口过期判断按全局时区（北京 0 点）而非 UTC。
-func TestNeedsDailyReset_FollowsServerTimezone(t *testing.T) {
+// 日窗口按全局服务器时区切分，而不是 UTC。
+func TestLazyZeroQuotaForResponse_DailyFollowsServerTimezone(t *testing.T) {
 	if err := timezone.Init("Asia/Shanghai"); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
@@ -89,45 +50,164 @@ func TestNeedsDailyReset_FollowsServerTimezone(t *testing.T) {
 
 	// now = 2026-05-25 23:00 UTC = 2026-05-26 07:00 +08（北京 5/26）
 	now := time.Date(2026, 5, 25, 23, 0, 0, 0, time.UTC)
+	windows := service.LocalQuotaWindows(now)
 
-	// start = 2026-05-25 10:00 UTC = 2026-05-25 18:00 +08（北京 5/25）→ 应判定为过期
-	startPrevBeijingDay := time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC)
-	if !NeedsDailyReset(&startPrevBeijingDay, now) {
-		t.Error("上一个北京日的窗口应判定为过期")
-	}
+	t.Run("上一个北京日的窗口已过期，用量归零且不给 resets_at", func(t *testing.T) {
+		// 2026-05-25 10:00 UTC = 北京 5/25 18:00
+		start := time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC)
+		out := LazyZeroQuotaForResponse(service.UserPlatformQuotaRecord{
+			Platform: "openai", DailyUsageUSD: 3.5, DailyWindowStart: &start,
+		}, windows, now, false)
 
-	// start = 2026-05-25 20:00 UTC = 2026-05-26 04:00 +08（北京 5/26 同日）→ 不应过期
-	startSameBeijingDay := time.Date(2026, 5, 25, 20, 0, 0, 0, time.UTC)
-	if NeedsDailyReset(&startSameBeijingDay, now) {
-		t.Error("同一北京日的窗口不应判定为过期")
-	}
+		if got := out["daily_usage_usd"]; got != 0.0 {
+			t.Errorf("daily_usage_usd = %v, want 0 (窗口已过期)", got)
+		}
+		if got := resetsAtOf(out, "daily_window_resets_at"); got != "" {
+			t.Errorf("过期窗口不应给 resets_at, got %q", got)
+		}
+	})
+
+	t.Run("同一北京日的窗口存活，resets_at = 次日北京 0 点", func(t *testing.T) {
+		// 2026-05-25 20:00 UTC = 北京 5/26 04:00
+		start := time.Date(2026, 5, 25, 20, 0, 0, 0, time.UTC)
+		out := LazyZeroQuotaForResponse(service.UserPlatformQuotaRecord{
+			Platform: "openai", DailyUsageUSD: 3.5, DailyWindowStart: &start,
+		}, windows, now, false)
+
+		if got := out["daily_usage_usd"]; got != 3.5 {
+			t.Errorf("daily_usage_usd = %v, want 3.5 (窗口未过期)", got)
+		}
+		want := time.Date(2026, 5, 27, 0, 0, 0, 0, timezone.Location()).Format(time.RFC3339)
+		if got := resetsAtOf(out, "daily_window_resets_at"); got != want {
+			t.Errorf("daily_window_resets_at = %q, want %q", got, want)
+		}
+	})
 }
 
-// TestNextDailyResetTime_FollowsServerTimezone 验证下次日重置 = 次日北京 0 点。
-func TestNextDailyResetTime_FollowsServerTimezone(t *testing.T) {
+// 未配置基准账号时，周窗口仍是自然周（下周一服务器时区 0 点）。
+func TestLazyZeroQuotaForResponse_WeeklyFallsBackToCalendarWeek(t *testing.T) {
 	if err := timezone.Init("Asia/Shanghai"); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 	t.Cleanup(func() { _ = timezone.Init("UTC") })
 
-	now := time.Date(2026, 5, 25, 23, 0, 0, 0, time.UTC)            // 北京 5/26 07:00
-	want := time.Date(2026, 5, 27, 0, 0, 0, 0, timezone.Location()) // 北京 5/27 00:00
-	if got := nextDailyResetTime(now); !got.Equal(want) {
-		t.Errorf("nextDailyResetTime = %v, want %v", got, want)
+	now := time.Date(2026, 5, 25, 23, 0, 0, 0, time.UTC) // 北京 5/26 周二
+	windows := service.LocalQuotaWindows(now)
+	start := timezone.StartOfWeek(now)
+
+	out := LazyZeroQuotaForResponse(service.UserPlatformQuotaRecord{
+		Platform: "openai", WeeklyUsageUSD: 1.0, WeeklyWindowStart: &start,
+	}, windows, now, false)
+
+	want := time.Date(2026, 6, 1, 0, 0, 0, 0, timezone.Location()).Format(time.RFC3339)
+	if got := resetsAtOf(out, "weekly_window_resets_at"); got != want {
+		t.Errorf("weekly_window_resets_at = %q, want %q", got, want)
+	}
+	if got := out["weekly_window_source"]; got != service.QuotaWindowSourceCalendar {
+		t.Errorf("weekly_window_source = %v, want calendar", got)
 	}
 }
 
-// TestNextWeeklyResetTime_FollowsServerTimezone 验证下次周重置 = 下周一北京 0 点。
-func TestNextWeeklyResetTime_FollowsServerTimezone(t *testing.T) {
-	if err := timezone.Init("Asia/Shanghai"); err != nil {
-		t.Fatalf("Init: %v", err)
-	}
-	t.Cleanup(func() { _ = timezone.Init("UTC") })
+// 配置了基准账号时，5h/周 的 resets_at 直接取上游窗口端点，
+// 且 window_source 标记为 account —— 前端据此显示「同步」标记。
+func TestLazyZeroQuotaForResponse_FollowsAccountWindow(t *testing.T) {
+	now := time.Date(2026, 5, 26, 7, 0, 0, 0, time.UTC)
+	upstreamEnd := time.Date(2026, 5, 26, 9, 12, 0, 0, time.UTC) // 故意不是整点
+	start := upstreamEnd.Add(-service.QuotaWindowFiveHourDuration)
 
-	// 北京 2026-05-26（周二）→ 下周一是 2026-06-01
-	now := time.Date(2026, 5, 25, 23, 0, 0, 0, time.UTC) // 北京 5/26 07:00 周二
-	want := time.Date(2026, 6, 1, 0, 0, 0, 0, timezone.Location())
-	if got := nextWeeklyResetTime(now); !got.Equal(want) {
-		t.Errorf("nextWeeklyResetTime = %v, want %v", got, want)
+	windows := service.LocalQuotaWindows(now)
+	windows[service.QuotaWindowFiveHour] = service.ResolvedQuotaWindow{
+		Start: &start, End: &upstreamEnd, Source: service.QuotaWindowSourceAccount,
+	}
+
+	out := LazyZeroQuotaForResponse(service.UserPlatformQuotaRecord{
+		Platform: "anthropic", FiveHourUsageUSD: 2.25, FiveHourWindowStart: &start,
+	}, windows, now, false)
+
+	if got := out["five_hour_usage_usd"]; got != 2.25 {
+		t.Errorf("five_hour_usage_usd = %v, want 2.25", got)
+	}
+	if got := resetsAtOf(out, "five_hour_window_resets_at"); got != upstreamEnd.Format(time.RFC3339) {
+		t.Errorf("five_hour_window_resets_at = %q, want %q", got, upstreamEnd.Format(time.RFC3339))
+	}
+	if got := out["five_hour_window_source"]; got != service.QuotaWindowSourceAccount {
+		t.Errorf("five_hour_window_source = %v, want account", got)
+	}
+}
+
+// 跟随基准账号的窗口，其边界由上游给定，与该用户本轮是否消费无关。
+// 即便用户从未消费（start=nil）或记录还停在上一轮，也必须报出 resets_at，
+// 否则前端拿不到倒计时，用户看到「有限额却不知何时刷新」。
+// 这是本地 E2E 抓到的缺陷，单测未覆盖 —— 回归锁定。
+func TestLazyZeroQuotaForResponse_AccountWindowAlwaysReportsResetsAt(t *testing.T) {
+	now := time.Date(2026, 5, 26, 7, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 5, 26, 9, 12, 0, 0, time.UTC)
+	start := end.Add(-service.QuotaWindowFiveHourDuration)
+	limit := 5.0
+
+	windows := service.LocalQuotaWindows(now)
+	windows[service.QuotaWindowFiveHour] = service.ResolvedQuotaWindow{
+		Start: &start, End: &end, Source: service.QuotaWindowSourceAccount,
+	}
+
+	prev := start.Add(-service.QuotaWindowFiveHourDuration)
+	cases := map[string]*time.Time{
+		"用户从未消费（start=nil）": nil,
+		"用户记录停在上一轮窗口":       &prev,
+	}
+	for name, storedStart := range cases {
+		t.Run(name, func(t *testing.T) {
+			out := LazyZeroQuotaForResponse(service.UserPlatformQuotaRecord{
+				Platform:            "anthropic",
+				FiveHourLimitUSD:    &limit,
+				FiveHourUsageUSD:    3.0,
+				FiveHourWindowStart: storedStart,
+			}, windows, now, false)
+
+			if got := out["five_hour_usage_usd"]; got != 0.0 {
+				t.Errorf("跨轮用量应归零, got %v", got)
+			}
+			want := end.Format(time.RFC3339)
+			if got := resetsAtOf(out, "five_hour_window_resets_at"); got != want {
+				t.Errorf("five_hour_window_resets_at = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// 反向保证：calendar / rolling 的展示语义（D14 过期不给 resets_at）不受上面的改动影响。
+func TestLazyZeroQuotaForResponse_NonAccountWindowKeepsD14Semantics(t *testing.T) {
+	now := time.Date(2026, 5, 26, 7, 0, 0, 0, time.UTC)
+	windows := service.LocalQuotaWindows(now)
+	yesterday := timezone.StartOfDay(now).AddDate(0, 0, -1)
+
+	out := LazyZeroQuotaForResponse(service.UserPlatformQuotaRecord{
+		Platform: "openai", DailyUsageUSD: 2.0, DailyWindowStart: &yesterday,
+	}, windows, now, false)
+
+	if got := resetsAtOf(out, "daily_window_resets_at"); got != "" {
+		t.Errorf("calendar 窗口过期后仍不应给 resets_at, got %q", got)
+	}
+}
+
+// 基准账号窗口滚动后，上一轮的起点必须被判定为跨窗并归零 ——
+// 这是「账号窗口一滚，所有用户同刻清零」的核心行为。
+func TestLazyZeroQuotaForResponse_ZeroesUsageWhenAccountWindowRolled(t *testing.T) {
+	now := time.Date(2026, 5, 26, 7, 0, 0, 0, time.UTC)
+	newEnd := time.Date(2026, 5, 26, 9, 12, 0, 0, time.UTC)
+	newStart := newEnd.Add(-service.QuotaWindowFiveHourDuration)
+	prevStart := newStart.Add(-service.QuotaWindowFiveHourDuration) // 上一轮窗口
+
+	windows := service.LocalQuotaWindows(now)
+	windows[service.QuotaWindowFiveHour] = service.ResolvedQuotaWindow{
+		Start: &newStart, End: &newEnd, Source: service.QuotaWindowSourceAccount,
+	}
+
+	out := LazyZeroQuotaForResponse(service.UserPlatformQuotaRecord{
+		Platform: "anthropic", FiveHourUsageUSD: 9.99, FiveHourWindowStart: &prevStart,
+	}, windows, now, false)
+
+	if got := out["five_hour_usage_usd"]; got != 0.0 {
+		t.Errorf("five_hour_usage_usd = %v, want 0 (账号窗口已滚动)", got)
 	}
 }

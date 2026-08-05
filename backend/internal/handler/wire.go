@@ -190,7 +190,16 @@ func ProvideHandlers(
 	batchImageHandler *BatchImageHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
+	quotaWindowSync *service.QuotaWindowSyncService,
 ) *Handlers {
+	// 在此处注入而非各自的构造函数：QuotaWindowSyncService 依赖 AccountRepository
+	// 与 TimingWheel，两者在依赖图上晚于这两个 handler 构造，作为构造参数会迫使整张图重排。
+	// 限额展示必须与 enforcement 用同一份窗口边界，否则用户会看到
+	// 「显示还有额度但请求被拒」的矛盾状态。
+	userHandler.SetQuotaWindowResolver(quotaWindowSync)
+	if adminHandlers != nil && adminHandlers.User != nil {
+		adminHandlers.User.SetQuotaWindowResolver(quotaWindowSync)
+	}
 	return &Handlers{
 		Auth:             authHandler,
 		User:             userHandler,

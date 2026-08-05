@@ -140,7 +140,7 @@ func TestUserPlatformQuotaRepository_IncrementUsageWithReset_SameWindow(t *testi
 	now := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC) // 周五
 
 	// 首次调用：应新建记录
-	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 1.5, now))
+	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 1.5, now, service.LocalQuotaWindows(now)))
 
 	rec, err := repo.GetByUserPlatform(ctx, userID, "anthropic")
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestUserPlatformQuotaRepository_IncrementUsageWithReset_SameWindow(t *testi
 	require.InDelta(t, 1.5, rec.MonthlyUsageUSD, 1e-9, "initial monthly usage")
 
 	// 同一天再次调用：应累加
-	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 0.5, now))
+	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 0.5, now, service.LocalQuotaWindows(now)))
 
 	rec, err = repo.GetByUserPlatform(ctx, userID, "anthropic")
 	require.NoError(t, err)
@@ -169,8 +169,8 @@ func TestUserPlatformQuotaRepository_IncrementUsageWithReset_DailyReset(t *testi
 	day1 := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC) // 周五（同一周、同一月）
 	day2 := time.Date(2026, 5, 23, 10, 0, 0, 0, time.UTC) // 周六（同一周、同一月）
 
-	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 3.0, day1))
-	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 1.0, day2))
+	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 3.0, day1, service.LocalQuotaWindows(day1)))
+	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 1.0, day2, service.LocalQuotaWindows(day2)))
 
 	rec, err := repo.GetByUserPlatform(ctx, userID, "anthropic")
 	require.NoError(t, err)
@@ -190,8 +190,8 @@ func TestUserPlatformQuotaRepository_IncrementUsageWithReset_WeeklyReset(t *test
 	fri := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
 	nextMon := time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC) // 下一周周一
 
-	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "openai", 5.0, fri))
-	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "openai", 2.0, nextMon))
+	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "openai", 5.0, fri, service.LocalQuotaWindows(fri)))
+	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "openai", 2.0, nextMon, service.LocalQuotaWindows(nextMon)))
 
 	rec, err := repo.GetByUserPlatform(ctx, userID, "openai")
 	require.NoError(t, err)

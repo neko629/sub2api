@@ -80,6 +80,11 @@ func Platform(v string) predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldEQ(FieldPlatform, v))
 }
 
+// FiveHourLimitUsd applies equality check predicate on the "five_hour_limit_usd" field. It's identical to FiveHourLimitUsdEQ.
+func FiveHourLimitUsd(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldEQ(FieldFiveHourLimitUsd, v))
+}
+
 // DailyLimitUsd applies equality check predicate on the "daily_limit_usd" field. It's identical to DailyLimitUsdEQ.
 func DailyLimitUsd(v float64) predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldEQ(FieldDailyLimitUsd, v))
@@ -95,6 +100,11 @@ func MonthlyLimitUsd(v float64) predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldEQ(FieldMonthlyLimitUsd, v))
 }
 
+// FiveHourUsageUsd applies equality check predicate on the "five_hour_usage_usd" field. It's identical to FiveHourUsageUsdEQ.
+func FiveHourUsageUsd(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldEQ(FieldFiveHourUsageUsd, v))
+}
+
 // DailyUsageUsd applies equality check predicate on the "daily_usage_usd" field. It's identical to DailyUsageUsdEQ.
 func DailyUsageUsd(v float64) predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldEQ(FieldDailyUsageUsd, v))
@@ -108,6 +118,11 @@ func WeeklyUsageUsd(v float64) predicate.UserPlatformQuota {
 // MonthlyUsageUsd applies equality check predicate on the "monthly_usage_usd" field. It's identical to MonthlyUsageUsdEQ.
 func MonthlyUsageUsd(v float64) predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldEQ(FieldMonthlyUsageUsd, v))
+}
+
+// FiveHourWindowStart applies equality check predicate on the "five_hour_window_start" field. It's identical to FiveHourWindowStartEQ.
+func FiveHourWindowStart(v time.Time) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldEQ(FieldFiveHourWindowStart, v))
 }
 
 // DailyWindowStart applies equality check predicate on the "daily_window_start" field. It's identical to DailyWindowStartEQ.
@@ -340,6 +355,56 @@ func PlatformContainsFold(v string) predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldContainsFold(FieldPlatform, v))
 }
 
+// FiveHourLimitUsdEQ applies the EQ predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdEQ(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldEQ(FieldFiveHourLimitUsd, v))
+}
+
+// FiveHourLimitUsdNEQ applies the NEQ predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdNEQ(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldNEQ(FieldFiveHourLimitUsd, v))
+}
+
+// FiveHourLimitUsdIn applies the In predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdIn(vs ...float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldIn(FieldFiveHourLimitUsd, vs...))
+}
+
+// FiveHourLimitUsdNotIn applies the NotIn predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdNotIn(vs ...float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldNotIn(FieldFiveHourLimitUsd, vs...))
+}
+
+// FiveHourLimitUsdGT applies the GT predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdGT(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldGT(FieldFiveHourLimitUsd, v))
+}
+
+// FiveHourLimitUsdGTE applies the GTE predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdGTE(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldGTE(FieldFiveHourLimitUsd, v))
+}
+
+// FiveHourLimitUsdLT applies the LT predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdLT(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldLT(FieldFiveHourLimitUsd, v))
+}
+
+// FiveHourLimitUsdLTE applies the LTE predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdLTE(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldLTE(FieldFiveHourLimitUsd, v))
+}
+
+// FiveHourLimitUsdIsNil applies the IsNil predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdIsNil() predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldIsNull(FieldFiveHourLimitUsd))
+}
+
+// FiveHourLimitUsdNotNil applies the NotNil predicate on the "five_hour_limit_usd" field.
+func FiveHourLimitUsdNotNil() predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldNotNull(FieldFiveHourLimitUsd))
+}
+
 // DailyLimitUsdEQ applies the EQ predicate on the "daily_limit_usd" field.
 func DailyLimitUsdEQ(v float64) predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldEQ(FieldDailyLimitUsd, v))
@@ -490,6 +555,46 @@ func MonthlyLimitUsdNotNil() predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldNotNull(FieldMonthlyLimitUsd))
 }
 
+// FiveHourUsageUsdEQ applies the EQ predicate on the "five_hour_usage_usd" field.
+func FiveHourUsageUsdEQ(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldEQ(FieldFiveHourUsageUsd, v))
+}
+
+// FiveHourUsageUsdNEQ applies the NEQ predicate on the "five_hour_usage_usd" field.
+func FiveHourUsageUsdNEQ(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldNEQ(FieldFiveHourUsageUsd, v))
+}
+
+// FiveHourUsageUsdIn applies the In predicate on the "five_hour_usage_usd" field.
+func FiveHourUsageUsdIn(vs ...float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldIn(FieldFiveHourUsageUsd, vs...))
+}
+
+// FiveHourUsageUsdNotIn applies the NotIn predicate on the "five_hour_usage_usd" field.
+func FiveHourUsageUsdNotIn(vs ...float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldNotIn(FieldFiveHourUsageUsd, vs...))
+}
+
+// FiveHourUsageUsdGT applies the GT predicate on the "five_hour_usage_usd" field.
+func FiveHourUsageUsdGT(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldGT(FieldFiveHourUsageUsd, v))
+}
+
+// FiveHourUsageUsdGTE applies the GTE predicate on the "five_hour_usage_usd" field.
+func FiveHourUsageUsdGTE(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldGTE(FieldFiveHourUsageUsd, v))
+}
+
+// FiveHourUsageUsdLT applies the LT predicate on the "five_hour_usage_usd" field.
+func FiveHourUsageUsdLT(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldLT(FieldFiveHourUsageUsd, v))
+}
+
+// FiveHourUsageUsdLTE applies the LTE predicate on the "five_hour_usage_usd" field.
+func FiveHourUsageUsdLTE(v float64) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldLTE(FieldFiveHourUsageUsd, v))
+}
+
 // DailyUsageUsdEQ applies the EQ predicate on the "daily_usage_usd" field.
 func DailyUsageUsdEQ(v float64) predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldEQ(FieldDailyUsageUsd, v))
@@ -608,6 +713,56 @@ func MonthlyUsageUsdLT(v float64) predicate.UserPlatformQuota {
 // MonthlyUsageUsdLTE applies the LTE predicate on the "monthly_usage_usd" field.
 func MonthlyUsageUsdLTE(v float64) predicate.UserPlatformQuota {
 	return predicate.UserPlatformQuota(sql.FieldLTE(FieldMonthlyUsageUsd, v))
+}
+
+// FiveHourWindowStartEQ applies the EQ predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartEQ(v time.Time) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldEQ(FieldFiveHourWindowStart, v))
+}
+
+// FiveHourWindowStartNEQ applies the NEQ predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartNEQ(v time.Time) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldNEQ(FieldFiveHourWindowStart, v))
+}
+
+// FiveHourWindowStartIn applies the In predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartIn(vs ...time.Time) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldIn(FieldFiveHourWindowStart, vs...))
+}
+
+// FiveHourWindowStartNotIn applies the NotIn predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartNotIn(vs ...time.Time) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldNotIn(FieldFiveHourWindowStart, vs...))
+}
+
+// FiveHourWindowStartGT applies the GT predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartGT(v time.Time) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldGT(FieldFiveHourWindowStart, v))
+}
+
+// FiveHourWindowStartGTE applies the GTE predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartGTE(v time.Time) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldGTE(FieldFiveHourWindowStart, v))
+}
+
+// FiveHourWindowStartLT applies the LT predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartLT(v time.Time) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldLT(FieldFiveHourWindowStart, v))
+}
+
+// FiveHourWindowStartLTE applies the LTE predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartLTE(v time.Time) predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldLTE(FieldFiveHourWindowStart, v))
+}
+
+// FiveHourWindowStartIsNil applies the IsNil predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartIsNil() predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldIsNull(FieldFiveHourWindowStart))
+}
+
+// FiveHourWindowStartNotNil applies the NotNil predicate on the "five_hour_window_start" field.
+func FiveHourWindowStartNotNil() predicate.UserPlatformQuota {
+	return predicate.UserPlatformQuota(sql.FieldNotNull(FieldFiveHourWindowStart))
 }
 
 // DailyWindowStartEQ applies the EQ predicate on the "daily_window_start" field.

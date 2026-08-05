@@ -188,7 +188,9 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 			deps.billingCacheService.IncrementUserPlatformQuotaUsage(p.User.ID, p.Platform, cost.ActualCost)
 			if deps.cfg == nil || !deps.cfg.Database.UserPlatformQuotaFlusherEnabled {
 				// 降级路径:flusher 未启用时保留原有同步直写 DB
-				if err := deps.userPlatformQuotaRepo.IncrementUsageWithReset(billingCtx, p.User.ID, p.Platform, cost.ActualCost, time.Now().UTC()); err != nil {
+				now := time.Now().UTC()
+				windows := deps.billingCacheService.ResolveQuotaWindows(p.Platform, now)
+				if err := deps.userPlatformQuotaRepo.IncrementUsageWithReset(billingCtx, p.User.ID, p.Platform, cost.ActualCost, now, windows); err != nil {
 					userPlatformQuotaDBIncrLegacyErrorTotal.Add(1)
 					logger.LegacyPrintf("service.gateway", "ALERT: legacy incr user platform quota DB failed user=%d platform=%s cost=%f: %v", p.User.ID, p.Platform, cost.ActualCost, err)
 				}
@@ -398,6 +400,10 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 				// 降级路径:flusher 未启用时保留原有异步直写 DB
 				dbCtx, dbCancel := detachUpstreamContext(ctx)
 				userID, platform, cost := p.User.ID, p.Platform, p.Cost.ActualCost
+				// 在派发 goroutine 前解析窗口:与本次 preflight 用同一时刻的边界,
+				// 避免 goroutine 延迟执行时跨过窗口切换点而把用量记进下一轮。
+				now := time.Now().UTC()
+				windows := deps.billingCacheService.ResolveQuotaWindows(platform, now)
 				go func() {
 					defer func() {
 						if r := recover(); r != nil {
@@ -405,7 +411,7 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 						}
 					}()
 					defer dbCancel()
-					if err := deps.userPlatformQuotaRepo.IncrementUsageWithReset(dbCtx, userID, platform, cost, time.Now().UTC()); err != nil {
+					if err := deps.userPlatformQuotaRepo.IncrementUsageWithReset(dbCtx, userID, platform, cost, now, windows); err != nil {
 						// 失败计数器:暴露给 GatewayUserPlatformQuotaIncrStats(),由 ops 面板做斜率告警。
 						userPlatformQuotaDBIncrErrorTotal.Add(1)
 						// ALERT 级别:DB 持久化失败意味着 Redis cache 失效后该笔 cost 永久丢失,

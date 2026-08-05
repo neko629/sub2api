@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
 )
 
@@ -74,7 +75,7 @@ func TestUpsertForUser_PreservesUsageAndWindowStart(t *testing.T) {
 	}))
 
 	now := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
-	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 3.5, now))
+	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "anthropic", 3.5, now, service.LocalQuotaWindows(now)))
 
 	newD := 50.0
 	require.NoError(t, repo.UpsertForUser(ctx, userID, []UserPlatformQuotaRecord{
