@@ -733,9 +733,10 @@ export default {
       platformQuota: {
         menuItem: 'Platform Quotas',
         title: 'Platform Quotas',
-        subtitle: 'Configure daily / weekly / monthly USD usage limits for each upstream platform for user {email}',
+        subtitle: 'Configure 5-hour / daily / weekly / monthly USD usage limits for each upstream platform for user {email}',
         columns: {
           platform: 'Platform',
+          fiveHour: '5-hour (USD)',
           daily: 'Daily (USD)',
           weekly: 'Weekly (USD)',
           monthly: 'Monthly (USD, 30-day rolling)',
@@ -746,7 +747,7 @@ export default {
         saving: 'Saving...',
         cancel: 'Cancel',
         clearAll: 'Clear All (remove all limits)',
-        clearAllConfirm: 'Clear daily / weekly / monthly limits for ALL platforms? All platforms will become "unlimited" with no local undo — you must manually re-enter values before saving.',
+        clearAllConfirm: 'Clear 5-hour / daily / weekly / monthly limits for ALL platforms? All platforms will become "unlimited" with no local undo — you must manually re-enter values before saving.',
         reset: {
           button: 'Reset window',
           confirm: 'Reset the {window} usage for {platform} for this user? This is effective immediately.',
@@ -757,6 +758,10 @@ export default {
         updateFailed: 'Save failed',
         loadFailed: 'Load failed',
         hint: 'Empty = no limit for that window.',
+        syncedNotice: "The 5-hour / weekly windows for {platforms} follow the upstream window of the configured usage reference account — when that account rolls over, every user's usage resets at the same instant, so the refresh time may not be on the hour. Platforms without a reference account fall back to a rolling 5-hour window anchored at first spend, and a calendar week (Monday 00:00).",
+        syncedBadge: 'synced',
+        syncedTooltip: 'Follows the reference account upstream window; next reset: {time}',
+        windowFiveHour: '5-hour',
         windowDaily: 'daily',
         windowWeekly: 'weekly',
         windowMonthly: 'monthly',

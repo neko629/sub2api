@@ -342,6 +342,34 @@ export async function clearRateLimit(id: number): Promise<Account> {
   return data
 }
 
+/** 可校准的上游用量窗口（仅 Anthropic OAuth / setup-token 账号支持）。 */
+export type CalibratableUsageWindow = '5h' | '7d' | '7d_oi'
+
+export interface CalibrateUsageWindowRequest {
+  window: CalibratableUsageWindow
+  /** RFC3339 时间串；必须晚于当前时刻，5h 窗口不得超过 6 小时后、7d 不得超过 8 天后 */
+  resets_at: string
+  /** 同时清零该窗口的 utilization 采样 */
+  reset_usage: boolean
+}
+
+/**
+ * Calibrate an account's upstream usage window (5h / 7d / 7d_oi).
+ *
+ * 若该账号被设为某平台的「用量基准账号」，此操作会同时平移所有用户的
+ * 5 小时 / 周限额窗口并使当前窗口用量作废 —— 调用前务必二次确认。
+ */
+export async function calibrateUsageWindow(
+  id: number,
+  payload: CalibrateUsageWindowRequest
+): Promise<Account> {
+  const { data } = await apiClient.post<Account>(
+    `/admin/accounts/${id}/calibrate-usage-window`,
+    payload
+  )
+  return data
+}
+
 /**
  * Recover account runtime state in one call
  * @param id - Account ID
@@ -1003,6 +1031,7 @@ export const accountsAPI = {
   getTodayStats,
   getBatchTodayStats,
   clearRateLimit,
+  calibrateUsageWindow,
   recoverState,
   resetAccountQuota,
   getTempUnschedulableStatus,

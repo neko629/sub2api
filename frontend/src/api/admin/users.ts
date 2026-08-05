@@ -331,26 +331,41 @@ export async function bindUserAuthIdentity(
  * Platform quota types
  */
 export type PlatformQuotaPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok'
-export type PlatformQuotaWindow = 'daily' | 'weekly' | 'monthly'
+export type PlatformQuotaWindow = 'five_hour' | 'daily' | 'weekly' | 'monthly'
+
+/**
+ * 窗口边界来源：
+ *  - account  跟随「用量基准账号」的真实上游窗口（5h / 周），刷新时刻可能不是整点
+ *  - calendar 自然日历边界（日；未配置基准账号时的周）
+ *  - rolling  从首次消费时刻起算（月；未配置基准账号时的 5h）
+ */
+export type PlatformQuotaWindowSource = 'account' | 'calendar' | 'rolling'
 
 export interface PlatformQuotaItem {
   platform: PlatformQuotaPlatform
+  five_hour_limit_usd: number | null
   daily_limit_usd: number | null
   weekly_limit_usd: number | null
   monthly_limit_usd: number | null
+  five_hour_usage_usd: number
   daily_usage_usd: number
   weekly_usage_usd: number
   monthly_usage_usd: number
+  five_hour_window_start?: string | null
   daily_window_start?: string | null
   weekly_window_start?: string | null
   monthly_window_start?: string | null
+  five_hour_window_resets_at?: string | null
   daily_window_resets_at?: string | null
   weekly_window_resets_at?: string | null
   monthly_window_resets_at?: string | null
+  five_hour_window_source?: PlatformQuotaWindowSource
+  weekly_window_source?: PlatformQuotaWindowSource
 }
 
 export interface PlatformQuotaUpdateItem {
   platform: PlatformQuotaPlatform
+  five_hour_limit_usd: number | null
   daily_limit_usd: number | null
   weekly_limit_usd: number | null
   monthly_limit_usd: number | null

@@ -2363,5 +2363,6 @@ export type {
   PlatformQuotaUpdateItem,
   PlatformQuotaPlatform,
   PlatformQuotaWindow,
+  PlatformQuotaWindowSource,
   PlatformQuotasResponse,
 } from '@/api/admin/users'

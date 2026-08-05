@@ -3984,6 +3984,50 @@
 
               <!-- ★ 新增：系统全局默认平台限额矩阵 -->
               <div class="border-t border-gray-100 pt-4 dark:border-dark-700">
+                <!-- 用量基准账号：决定 5h / 周限额窗口的边界来源 -->
+                <div class="mb-6">
+                  <label class="font-medium text-gray-900 dark:text-white">
+                    {{ t("admin.settings.quotaReference.title") }}
+                  </label>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.quotaReference.hint") }}
+                  </p>
+                  <p class="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
+                    {{ t("admin.settings.quotaReference.warning") }}
+                  </p>
+                  <div class="mt-3 overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                      <thead>
+                        <tr class="text-left text-xs text-gray-500 dark:text-gray-400">
+                          <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.platform") }}</th>
+                          <th class="pb-2 font-medium">{{ t("admin.settings.quotaReference.accountId") }}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="p in (['anthropic', 'openai', 'gemini', 'antigravity', 'grok'] as const)" :key="`ref-${p}`" class="align-top">
+                          <td class="pr-4 py-1">
+                            <span class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ p }}</span>
+                          </td>
+                          <td class="py-1">
+                            <input
+                              v-model.number="form.quota_reference_accounts[p]"
+                              type="number"
+                              min="0"
+                              step="1"
+                              class="input h-8 w-32 text-sm"
+                              :disabled="p !== 'anthropic'"
+                              :placeholder="t('admin.settings.quotaReference.placeholder')"
+                            />
+                            <span v-if="p !== 'anthropic'" class="ml-2 text-xs text-gray-400">
+                              {{ t("admin.settings.quotaReference.unsupported") }}
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
                 <div class="mb-3">
                   <label class="font-medium text-gray-900 dark:text-white">
                     {{ t("admin.settings.defaults.defaultPlatformQuotas") }}
@@ -4000,6 +4044,7 @@
                     <thead>
                       <tr class="text-left text-xs text-gray-500 dark:text-gray-400">
                         <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.platform") }}</th>
+                        <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.fiveHour") }}</th>
                         <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.daily") }}</th>
                         <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.weekly") }}</th>
                         <th class="pb-2 font-medium">{{ t("admin.settings.platformQuota.monthly") }}</th>
@@ -4009,6 +4054,16 @@
                       <tr v-for="p in (['anthropic', 'openai', 'gemini', 'antigravity', 'grok'] as const)" :key="p" class="align-top">
                         <td class="pr-4 py-1">
                           <span class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ p }}</span>
+                        </td>
+                        <td class="pr-4 py-1">
+                          <input
+                            v-model.number="form.default_platform_quotas[p]!.five_hour"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            class="input h-8 w-28 text-sm"
+                            :placeholder="t('admin.settings.platformQuota.placeholder')"
+                          />
                         </td>
                         <td class="pr-4 py-1">
                           <input
@@ -4335,6 +4390,7 @@
                           <thead>
                             <tr class="text-left text-xs text-gray-500 dark:text-gray-400">
                               <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.platform") }}</th>
+                              <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.fiveHour") }}</th>
                               <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.daily") }}</th>
                               <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.weekly") }}</th>
                               <th class="pb-2 font-medium">{{ t("admin.settings.platformQuota.monthly") }}</th>
@@ -4344,6 +4400,16 @@
                             <tr v-for="p in (['anthropic', 'openai', 'gemini', 'antigravity', 'grok'] as const)" :key="`${authSource.source}-pq-${p}`" class="align-top">
                               <td class="pr-4 py-1">
                                 <span class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ p }}</span>
+                              </td>
+                              <td class="pr-4 py-1">
+                                <input
+                                  v-model.number="authSourceDefaults[authSource.source].platform_quotas[p]!.five_hour"
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  class="input h-8 w-24 text-sm"
+                                  :placeholder="t('admin.settings.platformQuota.placeholder')"
+                                />
                               </td>
                               <td class="pr-4 py-1">
                                 <input
@@ -8664,6 +8730,7 @@ import {
   sanitizeAccountSchedulingThresholdsMap,
   sanitizePlatformQuotasMap,
   SCHEDULING_THRESHOLD_PLATFORMS,
+  sanitizeQuotaReferenceAccounts,
   defaultWeChatConnectScopesForMode,
   deriveWeChatConnectStoredMode,
   normalizeDefaultSubscriptionSettings,
@@ -9407,9 +9474,11 @@ type SettingsForm = Omit<
   openai_advanced_scheduler_weight_upstream_cost: string;
   openai_advanced_scheduler_weight_previous_response: string;
   openai_advanced_scheduler_weight_session_sticky: string;
-  // 系统全局平台限额 map；form 内始终归一化为全 4 平台对象（模板非空绑定依赖此不变量）
+  // 系统全局平台限额 map；form 内始终归一化为全 5 平台对象（模板非空绑定依赖此不变量）
   default_platform_quotas: DefaultPlatformQuotasMap;
   account_scheduling_thresholds: ReturnType<typeof normalizeAccountSchedulingThresholdsMap>;
+  // 用量基准账号：platform → account id（0 = 不指定）
+  quota_reference_accounts: Record<string, number>;
 };
 
 const schedulingThresholdPlatforms = SCHEDULING_THRESHOLD_PLATFORMS;
@@ -9438,6 +9507,7 @@ const form = reactive<SettingsForm>({
   default_balance: 0,
   default_platform_quotas: normalizePlatformQuotasMap() as DefaultPlatformQuotasMap,
   account_scheduling_thresholds: normalizeAccountSchedulingThresholdsMap(),
+  quota_reference_accounts: {},
   affiliate_rebate_rate: 20,
   affiliate_rebate_freeze_hours: 0,
   affiliate_rebate_duration_days: 0,
@@ -10701,6 +10771,7 @@ async function loadSettings() {
     form.account_scheduling_thresholds = normalizeAccountSchedulingThresholdsMap(
       settings.account_scheduling_thresholds,
     );
+    form.quota_reference_accounts = { ...(settings.quota_reference_accounts ?? {}) } as Record<string, number>;
     form.backend_mode_enabled = settings.backend_mode_enabled;
     form.default_subscriptions = normalizeDefaultSubscriptionSettings(
       settings.default_subscriptions,
@@ -11383,6 +11454,11 @@ async function saveSettings() {
     payload.account_scheduling_thresholds = sanitizeAccountSchedulingThresholdsMap(
       form.account_scheduling_thresholds,
     );
+    // 必须清洗：清空输入框时 v-model.number 产出空字符串，直接提交会让整个
+    // 设置保存 400（后端字段是 map[string]int64），把无关设置一起拖挂。
+    payload.quota_reference_accounts = sanitizeQuotaReferenceAccounts(
+      form.quota_reference_accounts as Record<string, unknown>
+    );
     appendAuthSourceDefaultsToUpdateRequest(payload, authSourceDefaults);
 
     const updated = await settingsStepUp.run(() =>
@@ -11399,6 +11475,7 @@ async function saveSettings() {
     form.account_scheduling_thresholds = normalizeAccountSchedulingThresholdsMap(
       updated.account_scheduling_thresholds,
     );
+    form.quota_reference_accounts = { ...(updated.quota_reference_accounts ?? {}) } as Record<string, number>;
     registrationEmailSuffixWhitelistTags.value =
       normalizeRegistrationEmailSuffixDomains(
         updated.registration_email_suffix_whitelist,

@@ -393,8 +393,17 @@ export default {
         defaultPlatformQuotasHint: '新用户注册时自动写入平台限额记录；已有用户不受影响。留空 = 该平台该窗口不限制。',
         platformQuotaNotice: '月限额为 30 天滚动窗口，非自然月',
       },
+      quotaReference: {
+        title: '用量基准账号',
+        hint: '指定每个平台由哪个账号的上游窗口来驱动所有用户的 5 小时 / 周限额刷新时刻。填账号 ID，留空或 0 = 不指定。',
+        warning: '留空时：5 小时按「首次消费起算」滚动、周按自然周（周一 0 点），与该功能引入前完全一致。指定后基准账号窗口一滚动，所有用户的对应用量同刻清零，刷新时刻可能不是整点。',
+        accountId: '基准账号 ID',
+        placeholder: '不指定',
+        unsupported: '该平台无 5h/7d 上游窗口',
+      },
       platformQuota: {
         platform:    '平台',
+        fiveHour:    '5 小时限额 (USD)',
         daily:       '日限额 (USD)',
         weekly:      '周限额 (USD)',
         monthly:     '月限额 (USD, 30天滚动)',

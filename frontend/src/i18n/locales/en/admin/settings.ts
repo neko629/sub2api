@@ -398,8 +398,17 @@ export default {
         defaultPlatformQuotasHint: 'Automatically assigned to new users on signup; existing users are not affected. Leave blank = unlimited.',
         platformQuotaNotice: 'Monthly quota uses a 30-day rolling window, not a calendar month.',
       },
+      quotaReference: {
+        title: 'Usage Reference Account',
+        hint: "Choose which account's upstream window drives every user's 5-hour / weekly quota reset for each platform. Enter an account ID; blank or 0 means none.",
+        warning: "When blank: the 5-hour window rolls from first spend and the weekly window follows the calendar week (Monday 00:00) — identical to the behaviour before this feature. Once set, every user's usage resets the instant the reference account window rolls over, so the refresh time may not be on the hour.",
+        accountId: 'Reference account ID',
+        placeholder: 'none',
+        unsupported: 'No 5h/7d upstream window on this platform',
+      },
       platformQuota: {
         platform:    'Platform',
+        fiveHour:    '5-hour (USD)',
         daily:       'Daily (USD)',
         weekly:      'Weekly (USD)',
         monthly:     'Monthly (USD, 30d rolling)',

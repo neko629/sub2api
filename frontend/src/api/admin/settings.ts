@@ -18,17 +18,43 @@ export interface DefaultSubscriptionSetting {
 
 // ── 平台限额类型 ──────────────────────────────────────────────────
 export type PlatformType = "anthropic" | "openai" | "gemini" | "antigravity" | "grok"
-export type QuotaWindowType = "daily" | "weekly" | "monthly"
+export type QuotaWindowType = "five_hour" | "daily" | "weekly" | "monthly"
 
-/** 单平台三档限额；null = 不限制，undefined = 未填（等价 null） */
+/** 单平台四档限额；null = 不限制，undefined = 未填（等价 null） */
 export interface PlatformQuotaLimits {
-  daily:   number | null
-  weekly:  number | null
-  monthly: number | null
+  five_hour: number | null
+  daily:     number | null
+  weekly:    number | null
+  monthly:   number | null
 }
 
 /** 全平台默认限额 map（key = PlatformType） */
 export type DefaultPlatformQuotasMap = Partial<Record<PlatformType, PlatformQuotaLimits>>
+
+/** 用量基准账号 map（key = PlatformType，value = account id；缺省 = 不指定） */
+export type QuotaReferenceAccountsMap = Partial<Record<PlatformType, number>>
+
+/**
+ * 提交前清洗基准账号 map。
+ *
+ * `v-model.number` 在输入框被清空时产出的是**空字符串**而不是 null
+ * （Vue 的 looseToNumber 在 parseFloat 得到 NaN 时原样返回），而后端字段是
+ * map[string]int64 —— 直接提交会让整个系统设置的 PUT 反序列化失败返回 400，
+ * 连同页面上其它无关设置一起保存不了，而「留空 = 不指定」正是 UI 明示的用法。
+ * 非正整数一律丢弃（等价于该平台不指定基准账号）。
+ */
+export function sanitizeQuotaReferenceAccounts(
+  input?: Record<string, unknown> | null
+): QuotaReferenceAccountsMap {
+  const result: QuotaReferenceAccountsMap = {}
+  if (!input) return result
+  for (const p of PLATFORMS) {
+    const raw = input[p]
+    const n = typeof raw === "number" ? raw : Number(raw)
+    if (Number.isInteger(n) && n > 0) result[p] = n
+  }
+  return result
+}
 
 const PLATFORMS: PlatformType[] = ["anthropic", "openai", "gemini", "antigravity", "grok"]
 
@@ -64,27 +90,33 @@ export function sanitizeAccountSchedulingThresholdsMap(
   return normalizeAccountSchedulingThresholdsMap(input)
 }
 
-/** 归一化为全 4 平台 × 3 窗口（缺失填 null），供模板非空绑定 */
+/** 归一化为全 5 平台 × 4 窗口（缺失填 null），供模板非空绑定 */
 export function normalizePlatformQuotasMap(input?: DefaultPlatformQuotasMap | null): DefaultPlatformQuotasMap {
   const result: DefaultPlatformQuotasMap = {}
   for (const p of PLATFORMS) {
     const src = input?.[p]
     result[p] = {
-      daily:   typeof src?.daily === "number" ? src.daily : null,
-      weekly:  typeof src?.weekly === "number" ? src.weekly : null,
-      monthly: typeof src?.monthly === "number" ? src.monthly : null,
+      five_hour: typeof src?.five_hour === "number" ? src.five_hour : null,
+      daily:     typeof src?.daily === "number" ? src.daily : null,
+      weekly:    typeof src?.weekly === "number" ? src.weekly : null,
+      monthly:   typeof src?.monthly === "number" ? src.monthly : null,
     }
   }
   return result
 }
 
-/** 提交前清洗：非有限数/负数/空字符串 → null（保留 0 = 显式禁用），返回全 4 平台嵌套 map */
+/** 提交前清洗：非有限数/负数/空字符串 → null（保留 0 = 显式禁用），返回全 5 平台嵌套 map */
 export function sanitizePlatformQuotasMap(input?: DefaultPlatformQuotasMap | null): DefaultPlatformQuotasMap {
   const clean = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null)
   const result: DefaultPlatformQuotasMap = {}
   for (const p of PLATFORMS) {
     const src = input?.[p]
-    result[p] = { daily: clean(src?.daily), weekly: clean(src?.weekly), monthly: clean(src?.monthly) }
+    result[p] = {
+      five_hour: clean(src?.five_hour),
+      daily: clean(src?.daily),
+      weekly: clean(src?.weekly),
+      monthly: clean(src?.monthly),
+    }
   }
   return result
 }
@@ -456,6 +488,10 @@ export interface SystemSettings {
   auth_source_default_google_grant_on_signup?: boolean;
   auth_source_default_google_grant_on_first_bind?: boolean;
   force_email_on_third_party_signup?: boolean;
+  // ── 用量基准账号（platform → account id）────────────────────────────────────────
+  // 配置后该平台用户的 5h / 周限额窗口跟随该账号的真实上游窗口；
+  // 留空 = 5h 按首次消费起算滚动、周按自然周。
+  quota_reference_accounts?: QuotaReferenceAccountsMap;
   // ── 平台限额（嵌套 JSON，系统层 + 7 auth-source 层）────────────────────────────────
   default_platform_quotas?: DefaultPlatformQuotasMap;
   auth_source_default_email_platform_quotas?: DefaultPlatformQuotasMap;
@@ -794,6 +830,10 @@ export interface UpdateSettingsRequest {
   auth_source_default_google_grant_on_signup?: boolean;
   auth_source_default_google_grant_on_first_bind?: boolean;
   force_email_on_third_party_signup?: boolean;
+  // ── 用量基准账号（platform → account id）────────────────────────────────────────
+  // 配置后该平台用户的 5h / 周限额窗口跟随该账号的真实上游窗口；
+  // 留空 = 5h 按首次消费起算滚动、周按自然周。
+  quota_reference_accounts?: QuotaReferenceAccountsMap;
   // ── 平台限额（嵌套 JSON，系统层 + 7 auth-source 层）────────────────────────────────
   default_platform_quotas?: DefaultPlatformQuotasMap;
   auth_source_default_email_platform_quotas?: DefaultPlatformQuotasMap;
