@@ -5,6 +5,9 @@ WORKDIR /app
 # 安装必要的工具
 RUN apk add --no-cache git
 
+# 使用国内代理拉取 Go 模块（本地构建加速，未提交到 PR）
+ENV GOPROXY=https://goproxy.cn,direct
+
 # 复制go.mod和go.sum
 COPY go.mod go.sum ./
 
@@ -16,7 +19,7 @@ COPY . .
 
 # 构建应用
 RUN VERSION_VALUE="$(./scripts/resolve-version.sh)" && \
-    go build -ldflags="-s -w -X main.Version=${VERSION_VALUE}" -o main ./cmd/server/
+    go build -tags embed -ldflags="-s -w -X main.Version=${VERSION_VALUE}" -o main ./cmd/server/
 
 # 暴露端口
 EXPOSE 8080
